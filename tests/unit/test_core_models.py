@@ -1,0 +1,86 @@
+import pytest
+from fastrag.core.models.intent import IntentNode, IntentResult
+from fastrag.core.models.knowledge import (
+    KnowledgeBase, Document, DocumentChunk, ChunkWithEmbedding,
+)
+from fastrag.core.models.chat import (
+    ChatRequest, ChatMessage, ConversationHistory,
+    LLMEvent, GuidanceEvent, RetrievedChunk,
+)
+from fastrag.core.models.ingestion import (
+    IngestionConfig, IngestionContext, NodeResult,
+    FetcherSettings, ChunkerSettings,
+)
+
+
+def test_intent_node():
+    node = IntentNode(id="n1", name="Finance", level="domain")
+    assert node.intent_type == "kb"
+    assert node.keywords == []
+
+
+def test_intent_result_defaults():
+    r = IntentResult()
+    assert r.confidence == 0.0
+    assert r.needs_guidance is False
+
+
+def test_chat_request():
+    req = ChatRequest(query="hello", conversation_id="conv-1")
+    assert req.query == "hello"
+
+
+def test_conversation_history_empty():
+    h = ConversationHistory()
+    assert h.messages == []
+    assert h.summary is None
+
+
+def test_llm_event():
+    e = LLMEvent(type="content", content="Hello")
+    assert e.content == "Hello"
+
+
+def test_guidance_event_has_intent():
+    intent = IntentResult(needs_guidance=True, guidance_message="Which domain?")
+    event = GuidanceEvent(intent=intent)
+    assert event.type == "guidance"
+    assert event.intent.needs_guidance is True
+
+
+def test_retrieved_chunk():
+    c = RetrievedChunk(content="text", score=0.95, document_id="doc-1")
+    assert c.score == 0.95
+
+
+def test_document_chunk():
+    dc = DocumentChunk(content="chunk text", chunk_index=0)
+    assert dc.metadata == {}
+
+
+def test_chunk_with_embedding():
+    dc = DocumentChunk(content="text", chunk_index=0)
+    cwe = ChunkWithEmbedding(chunk=dc, embedding=[0.1, 0.2, 0.3])
+    assert len(cwe.embedding) == 3
+
+
+def test_ingestion_config_defaults():
+    cfg = IngestionConfig(
+        fetcher=FetcherSettings(source_type="local", source_uri="/tmp/file.pdf"),
+        parser={"parser_type": "unstructured"},
+        chunker=ChunkerSettings(),
+    )
+    assert cfg.enhancer is None
+    assert cfg.chunker.chunk_size == 500
+
+
+def test_ingestion_context_fields():
+    from fastrag.core.models.ingestion import ParserSettings
+    cfg = IngestionConfig(
+        fetcher=FetcherSettings(source_type="local", source_uri="/tmp/a.pdf"),
+        parser=ParserSettings(),
+        chunker=ChunkerSettings(),
+    )
+    ctx = IngestionContext(pipeline_id="p1", task_id="t1", config=cfg)
+    assert ctx.chunks == []
+    assert ctx.node_results == []
