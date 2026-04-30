@@ -1,4 +1,4 @@
-from fastrag.config.settings import Settings, LLMSettings, EmbeddingSettings
+from backend.config.settings import Settings, LLMSettings, EmbeddingSettings
 
 
 def test_settings_defaults():
@@ -26,11 +26,11 @@ def test_settings_env_override(monkeypatch):
 
 
 def test_db_base_has_metadata():
-    from fastrag.db.models.base import Base
+    from backend.db.models.base import Base
     assert Base.metadata is not None
 
 
 def test_session_factory_creation():
-    from fastrag.db.session import create_session_factory
+    from backend.db.session import create_session_factory
     factory = create_session_factory("postgresql+asyncpg://user:pw@localhost/db")
     assert factory is not None

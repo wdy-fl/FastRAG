@@ -1,8 +1,8 @@
 import pytest
-from fastrag.core.ingestion.strategies.chunker.fixed import FixedSizeChunker
-from fastrag.core.ingestion.strategies.chunker.paragraph import ParagraphChunker
-from fastrag.core.ingestion.strategies.chunker.structure_aware import StructureAwareChunker
-from fastrag.core.models.ingestion import ChunkerSettings
+from backend.core.ingestion.strategies.chunker.fixed import FixedSizeChunker
+from backend.core.ingestion.strategies.chunker.paragraph import ParagraphChunker
+from backend.core.ingestion.strategies.chunker.structure_aware import StructureAwareChunker
+from backend.core.models.ingestion import ChunkerSettings
 
 
 @pytest.mark.asyncio

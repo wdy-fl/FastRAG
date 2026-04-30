@@ -1,6 +1,6 @@
 import pytest
 from unittest.mock import AsyncMock, patch, MagicMock
-from fastrag.infra.cache.redis import RedisCache
+from backend.infra.cache.redis import RedisCache
 
 
 @pytest.mark.asyncio

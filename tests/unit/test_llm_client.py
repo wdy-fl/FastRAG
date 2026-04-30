@@ -2,8 +2,8 @@ import json
 import pytest
 import httpx
 from unittest.mock import AsyncMock, MagicMock, patch
-from fastrag.infra.llm.client import OpenAICompatClient
-from fastrag.core.models.chat import LLMEvent
+from backend.infra.llm.client import OpenAICompatClient
+from backend.core.models.chat import LLMEvent
 
 
 @pytest.mark.asyncio

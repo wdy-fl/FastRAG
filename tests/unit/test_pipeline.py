@@ -1,11 +1,11 @@
 import pytest
 import asyncio
 from unittest.mock import AsyncMock, MagicMock
-from fastrag.core.rag.pipeline import RAGPipeline
-from fastrag.core.models.chat import (
+from backend.core.rag.pipeline import RAGPipeline
+from backend.core.models.chat import (
     ChatRequest, ConversationHistory, LLMEvent, GuidanceEvent,
 )
-from fastrag.core.models.intent import IntentResult
+from backend.core.models.intent import IntentResult
 
 
 def _make_pipeline(needs_guidance=False, llm_content="Hello!", llm_stream_fn=None):

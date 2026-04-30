@@ -1,4 +1,4 @@
-from fastrag.core.rag.protocols import (
+from backend.core.rag.protocols import (
     LLMProvider, VectorStore, ConversationMemory,
     QueryRewriter, IntentClassifier,
 )

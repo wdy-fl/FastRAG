@@ -1,15 +1,15 @@
 import pytest
 from pydantic import ValidationError
-from fastrag.core.models.intent import IntentNode, IntentResult
-from fastrag.core.models.knowledge import (
+from backend.core.models.intent import IntentNode, IntentResult
+from backend.core.models.knowledge import (
     KnowledgeBase, Document, DocumentChunk, ChunkWithEmbedding,
 )
-from fastrag.core.models.chat import (
+from backend.core.models.chat import (
     ChatRequest, ChatMessage, ConversationHistory,
     LLMEvent, GuidanceEvent, MetaEvent, RetrievedChunk,
     ChatEvent,
 )
-from fastrag.core.models.ingestion import (
+from backend.core.models.ingestion import (
     IngestionConfig, IngestionContext, NodeResult,
     FetcherSettings, ChunkerSettings,
 )
@@ -77,26 +77,26 @@ def test_ingestion_config_defaults():
 
 
 def test_conversation_orm_instantiation():
-    from fastrag.db.models.conversation import ConversationORM
+    from backend.db.models.conversation import ConversationORM
     c = ConversationORM(id="c1", title="Test")
     assert c.id == "c1"
 
 
 def test_knowledge_chunk_orm_has_embedding_column():
-    from fastrag.db.models.knowledge import KnowledgeChunkORM
+    from backend.db.models.knowledge import KnowledgeChunkORM
     cols = {c.name for c in KnowledgeChunkORM.__table__.columns}
     assert "embedding" in cols
     assert "content" in cols
 
 
 def test_ingestion_task_orm():
-    from fastrag.db.models.ingestion import IngestionTaskORM
+    from backend.db.models.ingestion import IngestionTaskORM
     t = IngestionTaskORM(id="t1", knowledge_base_id="kb1", document_id="d1")
     assert t.status == "pending"
 
 
 def test_ingestion_context_fields():
-    from fastrag.core.models.ingestion import ParserSettings
+    from backend.core.models.ingestion import ParserSettings
     cfg = IngestionConfig(
         fetcher=FetcherSettings(source_type="local", source_uri="/tmp/a.pdf"),
         parser=ParserSettings(),

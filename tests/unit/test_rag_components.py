@@ -1,11 +1,11 @@
 import pytest
 from unittest.mock import AsyncMock
-from fastrag.core.rag.rewrite import LLMQueryRewriter
-from fastrag.core.rag.intent import LLMIntentClassifier
-from fastrag.core.rag.retrieve import MultiChannelRetriever, VectorSearchChannel, DeduplicationProcessor
-from fastrag.core.rag.prompt import PromptBuilder
-from fastrag.core.models.chat import ConversationHistory, LLMEvent, RetrievedChunk
-from fastrag.core.models.intent import IntentResult
+from backend.core.rag.rewrite import LLMQueryRewriter
+from backend.core.rag.intent import LLMIntentClassifier
+from backend.core.rag.retrieve import MultiChannelRetriever, VectorSearchChannel, DeduplicationProcessor
+from backend.core.rag.prompt import PromptBuilder
+from backend.core.models.chat import ConversationHistory, LLMEvent, RetrievedChunk
+from backend.core.models.intent import IntentResult
 
 
 async def _make_llm_stream(content: str):

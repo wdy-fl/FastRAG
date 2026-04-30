@@ -7,7 +7,7 @@ from sqlalchemy.ext.asyncio import async_engine_from_config
 
 from alembic import context
 
-from fastrag.db.models import Base  # imports all ORM models
+from backend.db.models import Base  # imports all ORM models
 
 config = context.config
 

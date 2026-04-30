@@ -1,9 +1,9 @@
 import pytest
 from uuid import uuid4
-from fastrag.db.repos.conversation import ConversationRepo
-from fastrag.db.repos.knowledge import KnowledgeRepo
-from fastrag.db.repos.trace import TraceRepo
-from fastrag.db.models.conversation import ConversationORM
+from backend.db.repos.conversation import ConversationRepo
+from backend.db.repos.knowledge import KnowledgeRepo
+from backend.db.repos.trace import TraceRepo
+from backend.db.models.conversation import ConversationORM
 
 
 @pytest.mark.asyncio
@@ -71,7 +71,7 @@ async def test_upsert_summary(db_session):
 
 @pytest.mark.asyncio
 async def test_create_and_update_document(db_session):
-    from fastrag.db.models.knowledge import KnowledgeBaseORM
+    from backend.db.models.knowledge import KnowledgeBaseORM
     from uuid import uuid4
 
     kb_id = str(uuid4())
@@ -97,7 +97,7 @@ async def test_create_and_update_document(db_session):
 
 @pytest.mark.asyncio
 async def test_trace_run_lifecycle(db_session):
-    from fastrag.db.models.conversation import ConversationORM
+    from backend.db.models.conversation import ConversationORM
     from uuid import uuid4
 
     conv_id = str(uuid4())

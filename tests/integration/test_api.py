@@ -2,14 +2,14 @@ import json
 import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
 from fastapi.testclient import TestClient
-from fastrag.core.models.chat import LLMEvent
+from backend.core.models.chat import LLMEvent
 
 
 def _make_app_with_mock_pipeline():
-    from fastrag.main import app
-    from fastrag.api import deps
-    from fastrag.core.rag.pipeline import RAGPipeline
-    from fastrag.infra.llm.client import OpenAICompatClient
+    from backend.main import app
+    from backend.api import deps
+    from backend.core.rag.pipeline import RAGPipeline
+    from backend.infra.llm.client import OpenAICompatClient
 
     mock_pipeline = MagicMock(spec=RAGPipeline)
 
@@ -58,8 +58,8 @@ def test_chat_stream_invalid_body_returns_422():
 
 def _mock_conv_repo():
     mock_repo = AsyncMock()
-    from fastrag.main import app
-    from fastrag.api import deps
+    from backend.main import app
+    from backend.api import deps
     app.dependency_overrides[deps.get_conversation_repo] = lambda: mock_repo
     return mock_repo, app
 
@@ -97,8 +97,8 @@ def test_delete_conversation_returns_204():
 # ---------------------------------------------------------------------------
 
 def test_create_knowledge_base_returns_201():
-    from fastrag.main import app
-    from fastrag.api import deps
+    from backend.main import app
+    from backend.api import deps
     mock_repo = AsyncMock()
     kb_mock = MagicMock()
     kb_mock.id = "kb1"
@@ -116,8 +116,8 @@ def test_create_knowledge_base_returns_201():
 
 
 def test_trigger_ingestion_returns_202():
-    from fastrag.main import app
-    from fastrag.api import deps
+    from backend.main import app
+    from backend.api import deps
     mock_repo = AsyncMock()
     mock_repo.create_document = AsyncMock(
         return_value=MagicMock(id="doc1", status="pending")
@@ -143,8 +143,8 @@ def test_trigger_ingestion_returns_202():
 # ---------------------------------------------------------------------------
 
 def test_get_intent_tree_returns_200():
-    from fastrag.main import app
-    from fastrag.api.deps import get_intent_repo
+    from backend.main import app
+    from backend.api.deps import get_intent_repo
     mock_repo = AsyncMock()
     mock_repo.list_intent_nodes = AsyncMock(return_value=[])
     app.dependency_overrides[get_intent_repo] = lambda: mock_repo
@@ -154,8 +154,8 @@ def test_get_intent_tree_returns_200():
 
 
 def test_list_traces_returns_200():
-    from fastrag.main import app
-    from fastrag.api import deps
+    from backend.main import app
+    from backend.api import deps
     mock_repo = AsyncMock()
     mock_repo.list_runs = AsyncMock(return_value=[])
     app.dependency_overrides[deps.get_trace_repo] = lambda: mock_repo
@@ -165,8 +165,8 @@ def test_list_traces_returns_200():
 
 
 def test_list_mappings_returns_200():
-    from fastrag.main import app
-    from fastrag.api.deps import get_mapping_repo
+    from backend.main import app
+    from backend.api.deps import get_mapping_repo
     mock_repo = AsyncMock()
     mock_repo.list_mappings = AsyncMock(return_value=[])
     app.dependency_overrides[get_mapping_repo] = lambda: mock_repo
@@ -198,7 +198,7 @@ def test_chat_stream_first_event_is_meta():
 
 def test_chat_stop_returns_200():
     """stop 端点对已注册 task_id 返回 200"""
-    import fastrag.api.routers.chat as chat_mod
+    import backend.api.routers.chat as chat_mod
     import asyncio
     app = _make_app_with_mock_pipeline()
     client = TestClient(app)

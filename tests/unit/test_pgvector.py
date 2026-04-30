@@ -1,9 +1,9 @@
 import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
-from fastrag.infra.vector.pgvector import PgVectorStore
-from fastrag.core.models.knowledge import DocumentChunk, ChunkWithEmbedding
-from fastrag.core.models.chat import RetrievedChunk
-from fastrag.db.models.knowledge import KnowledgeChunkORM
+from backend.infra.vector.pgvector import PgVectorStore
+from backend.core.models.knowledge import DocumentChunk, ChunkWithEmbedding
+from backend.core.models.chat import RetrievedChunk
+from backend.db.models.knowledge import KnowledgeChunkORM
 
 
 @pytest.mark.asyncio

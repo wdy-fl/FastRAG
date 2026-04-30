@@ -1,6 +1,6 @@
 import pytest
 from unittest.mock import AsyncMock, MagicMock
-from fastrag.core.rag.tracer import RagTracer
+from backend.core.rag.tracer import RagTracer
 
 
 @pytest.mark.asyncio

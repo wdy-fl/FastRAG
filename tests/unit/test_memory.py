@@ -1,8 +1,8 @@
 import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
-from fastrag.core.rag.memory import SlidingWindowMemory
-from fastrag.core.models.chat import ConversationHistory, ChatMessage
-from fastrag.db.models.conversation import MessageORM, ConversationSummaryORM
+from backend.core.rag.memory import SlidingWindowMemory
+from backend.core.models.chat import ConversationHistory, ChatMessage
+from backend.db.models.conversation import MessageORM, ConversationSummaryORM
 
 
 def _make_message(role: str, content: str, seq: int) -> MessageORM:
@@ -82,7 +82,7 @@ async def test_save_triggers_summary_compression_when_over_threshold():
 
     async def fake_stream(messages, **kwargs):
         async def _gen():
-            from fastrag.core.models.chat import LLMEvent
+            from backend.core.models.chat import LLMEvent
             yield LLMEvent(type="content", content="Summary text")
         return _gen()
 

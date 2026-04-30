@@ -1,14 +1,14 @@
 import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
-from fastrag.core.ingestion.engine import IngestionEngine
-from fastrag.core.ingestion.nodes.fetcher import FetcherNode
-from fastrag.core.ingestion.nodes.parser import ParserNode
-from fastrag.core.ingestion.nodes.chunker import ChunkerNode
-from fastrag.core.ingestion.nodes.indexer import IndexerNode
-from fastrag.core.models.ingestion import (
+from backend.core.ingestion.engine import IngestionEngine
+from backend.core.ingestion.nodes.fetcher import FetcherNode
+from backend.core.ingestion.nodes.parser import ParserNode
+from backend.core.ingestion.nodes.chunker import ChunkerNode
+from backend.core.ingestion.nodes.indexer import IndexerNode
+from backend.core.models.ingestion import (
     IngestionConfig, IngestionContext, FetcherSettings, ParserSettings, ChunkerSettings
 )
-from fastrag.core.models.knowledge import DocumentChunk
+from backend.core.models.knowledge import DocumentChunk
 
 
 def _make_config(source_type="local"):
@@ -120,7 +120,7 @@ async def test_engine_skips_none_optional_nodes():
 
 @pytest.mark.asyncio
 async def test_engine_records_failure_and_raises():
-    from fastrag.core.exceptions import IngestionError
+    from backend.core.exceptions import IngestionError
 
     mock_fetcher = AsyncMock()
 

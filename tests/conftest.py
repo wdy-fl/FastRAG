@@ -4,7 +4,7 @@ import pytest
 from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, AsyncSession
 from sqlalchemy import text
 
-from fastrag.db.models import Base
+from backend.db.models import Base
 
 TEST_DATABASE_URL = os.getenv(
     "FASTRAG_TEST_DATABASE_URL",

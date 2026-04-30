@@ -1,6 +1,6 @@
 import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
-from fastrag.infra.storage.s3 import S3Storage
+from backend.infra.storage.s3 import S3Storage
 
 
 @pytest.mark.asyncio
