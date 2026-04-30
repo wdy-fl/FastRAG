@@ -2,7 +2,6 @@ import * as React from "react";
 import { ArrowUpRight, BookOpen, Bot, Brain, Check, Lightbulb, Send, Square } from "lucide-react";
 
 import { cn } from "@/lib/utils";
-import { listSampleQuestions } from "@/services/sampleQuestionService";
 import { useChatStore } from "@/stores/chatStore";
 
 type PromptPreset = {
@@ -62,43 +61,6 @@ export function WelcomeScreen() {
   React.useEffect(() => {
     adjustHeight();
   }, [value, adjustHeight]);
-
-  React.useEffect(() => {
-    let active = true;
-
-    const loadPresets = async () => {
-      const data = await listSampleQuestions().catch(() => null);
-      if (!active || !data || data.length === 0) {
-        return;
-      }
-      const mapped = data
-        .filter((item) => item.question && item.question.trim())
-        .slice(0, 3)
-        .map((item, index) => {
-          const question = item.question.trim();
-          const title =
-            item.title?.trim() ||
-            (question.length > 12 ? `${question.slice(0, 12)}...` : question) ||
-            `推荐问法 ${index + 1}`;
-          const description = item.description?.trim() || "直接点选即可开始对话";
-          return {
-            id: item.id,
-            title,
-            description,
-            prompt: question,
-            icon: PRESET_ICONS[index % PRESET_ICONS.length]
-          };
-        });
-      if (mapped.length > 0) {
-        setPromptPresets(mapped);
-      }
-    };
-
-    loadPresets();
-    return () => {
-      active = false;
-    };
-  }, []);
 
   const applyPreset = React.useCallback(
     (prompt: string) => {

@@ -3,7 +3,6 @@ import { differenceInCalendarDays, isValid } from "date-fns";
 import {
   BookOpen,
   Bot,
-  LogOut,
   MessageSquare,
   MoreHorizontal,
   Pencil,
@@ -33,7 +32,6 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Loading } from "@/components/common/Loading";
 import { cn } from "@/lib/utils";
-import { useAuthStore } from "@/stores/authStore";
 import { useChatStore } from "@/stores/chatStore";
 
 interface SidebarProps {
@@ -54,7 +52,6 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
     fetchSessions
   } = useChatStore();
   const navigate = useNavigate();
-  const { user, logout } = useAuthStore();
   const [query, setQuery] = React.useState("");
   const [renamingId, setRenamingId] = React.useState<string | null>(null);
   const [renameValue, setRenameValue] = React.useState("");
@@ -62,7 +59,6 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
     id: string;
     title: string;
   } | null>(null);
-  const [avatarFailed, setAvatarFailed] = React.useState(false);
   const renameInputRef = React.useRef<HTMLInputElement | null>(null);
 
   React.useEffect(() => {
@@ -117,13 +113,6 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
     }
   }, [renamingId]);
 
-  React.useEffect(() => {
-    setAvatarFailed(false);
-  }, [user?.avatar, user?.userId]);
-
-  const avatarUrl = user?.avatar?.trim();
-  const showAvatar = Boolean(avatarUrl) && !avatarFailed;
-  const avatarFallback = (user?.username || user?.userId || "用户").slice(0, 1).toUpperCase();
   const sessionTitleFont =
     "-apple-system, BlinkMacSystemFont, \"Segoe UI\", Roboto, \"PingFang SC\", \"Hiragino Sans GB\", \"Microsoft YaHei\", \"Helvetica Neue\", Arial, sans-serif";
 
@@ -213,19 +202,17 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
                   <span className="block text-xs text-[#94A3B8]">从空白开始</span>
                 </span>
               </button>
-              {user?.role === "admin" ? (
-                <button
-                  type="button"
-                  className="mt-2 inline-flex items-center gap-2 rounded-full border border-white/80 bg-white/70 px-3 py-1.5 text-xs font-semibold text-[#1D4ED8] transition-colors hover:bg-white"
-                  onClick={() => {
-                    navigate("/admin");
-                    onClose();
-                  }}
-                >
-                  <Settings className="h-3.5 w-3.5" />
-                  管理后台
-                </button>
-              ) : null}
+              <button
+                type="button"
+                className="mt-2 inline-flex items-center gap-2 rounded-full border border-white/80 bg-white/70 px-3 py-1.5 text-xs font-semibold text-[#1D4ED8] transition-colors hover:bg-white"
+                onClick={() => {
+                  navigate("/admin");
+                  onClose();
+                }}
+              >
+                <Settings className="h-3.5 w-3.5" />
+                管理后台
+              </button>
             </div>
           </div>
           <div className="rounded-2xl border border-[#E6EEF6] bg-white p-3 shadow-[0_12px_26px_rgba(15,23,42,0.06)]">
@@ -390,23 +377,9 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
                 aria-label="用户菜单"
               >
                 <div className="flex h-8 w-8 items-center justify-center overflow-hidden rounded-full bg-[#3B82F6] text-white">
-                  {showAvatar ? (
-                    <img
-                      src={avatarUrl}
-                      alt={user?.username || user?.userId || "用户"}
-                      className="h-full w-full object-cover"
-                      onError={() => setAvatarFailed(true)}
-                    />
-                  ) : (
-                    <span className="text-sm font-medium">{avatarFallback}</span>
-                  )}
+                  <span className="text-sm font-medium">U</span>
                 </div>
-                <span className="flex-1 truncate text-sm font-medium text-[#1A1A1A]">
-                  {(() => {
-                    const fallback = user?.username || user?.userId || "用户";
-                    return /^\d+$/.test(fallback) ? "用户" : fallback;
-                  })()}
-                </span>
+                <span className="flex-1 truncate text-sm font-medium text-[#1A1A1A]">用户</span>
                 <MoreHorizontal className="h-4 w-4 text-[#999999]" />
               </button>
             </DropdownMenuTrigger>
@@ -432,10 +405,6 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
                   <PlayCircle className="mr-2 h-4 w-4" />
                   哔哩哔哩
                 </a>
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => logout()} className="text-rose-600 focus:text-rose-600">
-                <LogOut className="mr-2 h-4 w-4" />
-                退出登录
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
