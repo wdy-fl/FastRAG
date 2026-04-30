@@ -23,7 +23,7 @@ import {
 import { toast } from "sonner";
 import { Trash2 } from "lucide-react";
 
-export default function MappingPage() {
+export function MappingPage() {
   const [mappings, setMappings] = useState<Mapping[]>([]);
   const [kbs, setKbs] = useState<KnowledgeBase[]>([]);
   const [sourceTerm, setSourceTerm] = useState("");
@@ -32,12 +32,16 @@ export default function MappingPage() {
   const [loading, setLoading] = useState(false);
 
   async function fetchData() {
-    const [mRes, kRes] = await Promise.all([
-      mappingService.list(),
-      knowledgeService.listKnowledgeBases(),
-    ]);
-    setMappings(mRes.data);
-    setKbs(kRes.data);
+    try {
+      const [mRes, kRes] = await Promise.all([
+        mappingService.list(),
+        knowledgeService.listKnowledgeBases(),
+      ]);
+      setMappings(mRes.data);
+      setKbs(kRes.data);
+    } catch {
+      toast.error("加载数据失败");
+    }
   }
 
   useEffect(() => { fetchData(); }, []);
@@ -61,9 +65,13 @@ export default function MappingPage() {
   }
 
   async function handleDelete(id: string) {
-    await mappingService.delete(id);
-    toast.success("已删除");
-    fetchData();
+    try {
+      await mappingService.delete(id);
+      toast.success("已删除");
+      fetchData();
+    } catch {
+      toast.error("删除失败");
+    }
   }
 
   return (
