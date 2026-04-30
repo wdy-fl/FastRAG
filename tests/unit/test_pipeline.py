@@ -94,3 +94,15 @@ async def test_pipeline_saves_memory_after_chat():
 
     events = [event async for event in pipeline.chat(request)]
     pipeline._memory.save.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+async def test_chat_passes_deep_thinking_to_llm():
+    """deep_thinking=True 时 pipeline 应能接收请求且不抛异常。"""
+    pipeline = _make_pipeline(llm_content="Deep answer!")
+
+    events = []
+    async for e in pipeline.chat(ChatRequest(query="test", conversation_id="c1", deep_thinking=True)):
+        events.append(e)
+
+    assert any(e.type in ("content", "done") for e in events)
