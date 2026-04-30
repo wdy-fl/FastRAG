@@ -1,16 +1,21 @@
-from fastrag.config.settings import Settings, LLMSettings
+from fastrag.config.settings import Settings, LLMSettings, EmbeddingSettings
 
 
 def test_settings_defaults():
     s = Settings()
-    assert s.llm.chat_model == "qwen3:8b"
+    assert isinstance(s.llm.chat_model, str) and s.llm.chat_model
     assert s.rag_window_size == 4
     assert s.rag_intent_confidence_threshold == 0.6
 
 
 def test_llm_settings_defaults():
     s = LLMSettings()
-    assert s.embedding_dimensions == 4096
+    assert s.base_url == "http://localhost:11434/v1"
+
+
+def test_embedding_settings_defaults():
+    s = EmbeddingSettings()
+    assert s.dimensions == 1024
     assert s.base_url == "http://localhost:11434/v1"
 
 

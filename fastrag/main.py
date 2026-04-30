@@ -1,7 +1,7 @@
 from __future__ import annotations
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
-from fastrag.api.deps import get_llm_provider, get_redis_cache
+from fastrag.api.deps import get_llm_provider, get_embedding_provider, get_redis_cache
 from fastrag.api.routers import chat, conversation, knowledge, ingestion, intent, trace, mapping
 
 
@@ -10,6 +10,7 @@ async def lifespan(app: FastAPI):
     yield
     # Graceful shutdown
     await get_llm_provider().close()
+    await get_embedding_provider().close()
     await get_redis_cache().close()
 
 

@@ -8,7 +8,7 @@ from fastrag.config.settings import Settings
 
 
 _settings = Settings()
-_EMBEDDING_DIM = _settings.llm.embedding_dimensions
+_EMBEDDING_DIM = _settings.embedding.dimensions
 
 
 class KnowledgeBaseORM(Base):

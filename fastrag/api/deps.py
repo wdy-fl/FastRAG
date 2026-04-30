@@ -53,6 +53,16 @@ def get_llm_provider() -> OpenAICompatClient:
 
 
 @lru_cache
+def get_embedding_provider() -> OpenAICompatClient:
+    s = get_settings()
+    return OpenAICompatClient(
+        base_url=s.embedding.base_url,
+        api_key=s.embedding.api_key,
+        model=s.embedding.model,
+    )
+
+
+@lru_cache
 def get_vector_store() -> PgVectorStore:
     return PgVectorStore(session_factory=get_session_factory())
 
@@ -107,7 +117,7 @@ def get_rag_pipeline(
             confidence_threshold=s.rag_intent_confidence_threshold,
         ),
         retriever=MultiChannelRetriever(
-            channels=[VectorSearchChannel(vector_store=get_vector_store(), llm=llm)],
+            channels=[VectorSearchChannel(vector_store=get_vector_store(), llm=get_embedding_provider())],
             post_processors=[DeduplicationProcessor()],
         ),
         prompt_builder=PromptBuilder(),
@@ -141,7 +151,7 @@ def get_ingestion_engine() -> IngestionEngine:
                 }
             ),
             "enricher": None,
-            "indexer": IndexerNode(llm=llm, vector_store=get_vector_store()),
+            "indexer": IndexerNode(llm=get_embedding_provider(), vector_store=get_vector_store()),
         }
     )
 

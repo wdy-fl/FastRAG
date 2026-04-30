@@ -120,7 +120,7 @@ def upgrade() -> None:
     sa.Column('knowledge_base_id', sa.String(length=36), nullable=False),
     sa.Column('content', sa.Text(), nullable=False),
     sa.Column('chunk_index', sa.Integer(), nullable=False),
-    sa.Column('embedding', pgvector.sqlalchemy.vector.VECTOR(dim=4096), nullable=False),
+    sa.Column('embedding', pgvector.sqlalchemy.vector.VECTOR(dim=1024), nullable=False),
     sa.Column('metadata', sa.JSON(), nullable=False),
     sa.Column('created_at', sa.DateTime(), server_default=sa.text('now()'), nullable=False),
     sa.ForeignKeyConstraint(['document_id'], ['knowledge_documents.id'], ),

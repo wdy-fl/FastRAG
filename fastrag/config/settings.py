@@ -6,14 +6,20 @@ class LLMSettings(BaseModel):
     base_url: str = "http://localhost:11434/v1"
     api_key: str | None = None
     chat_model: str = "qwen3:8b"
-    embedding_model: str = "qwen3-embedding"
-    embedding_dimensions: int = 4096
+
+
+class EmbeddingSettings(BaseModel):
+    base_url: str = "http://localhost:11434/v1"
+    api_key: str | None = None
+    model: str = "qwen3-embedding"
+    dimensions: int = 1024
 
 
 class Settings(BaseSettings):
     database_url: str = "postgresql+asyncpg://postgres:postgres@localhost:5432/fastrag"
     redis_url: str = "redis://localhost:6379/0"
     llm: LLMSettings = LLMSettings()
+    embedding: EmbeddingSettings = EmbeddingSettings()
     rag_window_size: int = 4
     rag_summary_threshold: int = 5
     rag_retrieval_top_k: int = 10
