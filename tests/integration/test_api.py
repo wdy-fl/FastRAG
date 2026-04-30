@@ -126,3 +126,40 @@ def test_trigger_ingestion_returns_202():
         },
     )
     assert resp.status_code == 202
+
+
+# ---------------------------------------------------------------------------
+# Intent / Trace / Mapping tests
+# ---------------------------------------------------------------------------
+
+def test_get_intent_tree_returns_200():
+    from fastrag.main import app
+    from fastrag.api.deps import get_intent_repo
+    mock_repo = AsyncMock()
+    mock_repo.list_intent_nodes = AsyncMock(return_value=[])
+    app.dependency_overrides[get_intent_repo] = lambda: mock_repo
+    client = TestClient(app)
+    resp = client.get("/intent-trees")
+    assert resp.status_code == 200
+
+
+def test_list_traces_returns_200():
+    from fastrag.main import app
+    from fastrag.api import deps
+    mock_repo = AsyncMock()
+    mock_repo.list_runs = AsyncMock(return_value=[])
+    app.dependency_overrides[deps.get_trace_repo] = lambda: mock_repo
+    client = TestClient(app)
+    resp = client.get("/traces")
+    assert resp.status_code == 200
+
+
+def test_list_mappings_returns_200():
+    from fastrag.main import app
+    from fastrag.api.deps import get_mapping_repo
+    mock_repo = AsyncMock()
+    mock_repo.list_mappings = AsyncMock(return_value=[])
+    app.dependency_overrides[get_mapping_repo] = lambda: mock_repo
+    client = TestClient(app)
+    resp = client.get("/query-term-mappings")
+    assert resp.status_code == 200

@@ -64,3 +64,8 @@ class TraceRepo:
         stmt = select(RagTraceRunORM).where(RagTraceRunORM.id == run_id)
         result = await self._session.execute(stmt)
         return result.scalar_one_or_none()
+
+    async def list_runs(self) -> list[RagTraceRunORM]:
+        stmt = select(RagTraceRunORM).order_by(RagTraceRunORM.created_at.desc())
+        result = await self._session.execute(stmt)
+        return list(result.scalars().all())
