@@ -7,14 +7,14 @@ from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 from fastrag.api.deps import get_rag_pipeline, get_llm_provider
-from fastrag.core.models.chat import ChatRequest, LLMEvent, GuidanceEvent
+from fastrag.core.models.chat import ChatRequest, LLMEvent, GuidanceEvent, MetaEvent
 from fastrag.core.rag.pipeline import RAGPipeline
 from fastrag.infra.llm.client import OpenAICompatClient
 
 router = APIRouter()
 
-# 进程内 task 注册表：task_id -> asyncio.Task (or None)
-_task_registry: dict[str, asyncio.Task | None] = {}
+# 进程内 task 注册表：task_id -> asyncio.Task
+_task_registry: dict[str, asyncio.Task] = {}  # type: ignore[type-arg]
 
 
 async def _event_stream(
@@ -24,8 +24,8 @@ async def _event_stream(
     llm: OpenAICompatClient,
 ) -> AsyncIterator[str]:
     # 1. 发送 meta 事件
-    meta_payload = {"type": "meta", "task_id": task_id}
-    yield f"data: {json.dumps(meta_payload, ensure_ascii=False)}\n\n"
+    meta = MetaEvent(task_id=task_id)
+    yield f"data: {json.dumps(meta.model_dump(), ensure_ascii=False)}\n\n"
 
     # 2. 流式返回 pipeline 事件
     async for event in pipeline.chat(request):
@@ -103,6 +103,6 @@ async def chat_stop(body: StopRequest) -> dict:
     if body.task_id not in _task_registry:
         raise HTTPException(status_code=404, detail="task not found")
     task = _task_registry.pop(body.task_id)
-    if task and not task.done():
+    if not task.done():
         task.cancel()
     return {"status": "cancelled", "task_id": body.task_id}

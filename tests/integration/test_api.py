@@ -197,15 +197,18 @@ def test_chat_stream_first_event_is_meta():
 
 
 def test_chat_stop_returns_200():
-    """stop 端点对已知 task_id 返回 200（预先注册 fake task_id）"""
+    """stop 端点对已注册 task_id 返回 200"""
+    import fastrag.api.routers.chat as chat_mod
+    import asyncio
     app = _make_app_with_mock_pipeline()
     client = TestClient(app)
-    # 预先向 _task_registry 注册一个 fake task_id，规避 TestClient 同步等待导致流结束后 registry 被清空的问题
-    import fastrag.api.routers.chat as chat_mod
-    fake_task_id = "test-task-id-123"
-    chat_mod._task_registry[fake_task_id] = None  # type: ignore[assignment]
+    fake_task_id = "test-task-id-200"
+    mock_task = MagicMock(spec=asyncio.Task)
+    mock_task.done.return_value = False
+    chat_mod._task_registry[fake_task_id] = mock_task
     stop_resp = client.post("/chat/stop", json={"task_id": fake_task_id})
     assert stop_resp.status_code == 200
+    mock_task.cancel.assert_called_once()  # 验证 cancel 被调用
 
 
 def test_chat_stop_unknown_task_id_returns_404():
