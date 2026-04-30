@@ -72,3 +72,27 @@ class ConversationRepo:
         )
         result = await self._session.execute(stmt)
         return result.scalar_one()
+
+    async def create_conversation(self, title: str) -> ConversationORM:
+        conv = ConversationORM(id=str(uuid4()), title=title)
+        self._session.add(conv)
+        await self._session.commit()
+        await self._session.refresh(conv)
+        return conv
+
+    async def list_conversations(self) -> list[ConversationORM]:
+        stmt = select(ConversationORM).order_by(ConversationORM.created_at.desc())
+        result = await self._session.execute(stmt)
+        return list(result.scalars().all())
+
+    async def get_conversation(self, conversation_id: str) -> ConversationORM | None:
+        stmt = select(ConversationORM).where(ConversationORM.id == conversation_id)
+        result = await self._session.execute(stmt)
+        return result.scalar_one_or_none()
+
+    async def delete_conversation(self, conversation_id: str) -> None:
+        from sqlalchemy import delete
+        await self._session.execute(
+            delete(ConversationORM).where(ConversationORM.id == conversation_id)
+        )
+        await self._session.commit()
