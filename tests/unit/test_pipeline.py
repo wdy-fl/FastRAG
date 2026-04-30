@@ -8,16 +8,19 @@ from fastrag.core.models.chat import (
 from fastrag.core.models.intent import IntentResult
 
 
-def _make_pipeline(needs_guidance=False, llm_content="Hello!"):
+def _make_pipeline(needs_guidance=False, llm_content="Hello!", llm_stream_fn=None):
     mock_llm = AsyncMock()
 
-    def fake_stream(messages, **kwargs):
-        async def _gen():
-            yield LLMEvent(type="content", content=llm_content)
-            yield LLMEvent(type="done", content="")
-        return _gen()
+    if llm_stream_fn is not None:
+        mock_llm.stream = llm_stream_fn
+    else:
+        def fake_stream(messages, **kwargs):
+            async def _gen():
+                yield LLMEvent(type="content", content=llm_content)
+                yield LLMEvent(type="done", content="")
+            return _gen()
 
-    mock_llm.stream = fake_stream
+        mock_llm.stream = fake_stream
 
     mock_memory = AsyncMock()
     mock_memory.load = AsyncMock(return_value=ConversationHistory())
@@ -98,11 +101,16 @@ async def test_pipeline_saves_memory_after_chat():
 
 @pytest.mark.asyncio
 async def test_chat_passes_deep_thinking_to_llm():
-    """deep_thinking=True 时 pipeline 应能接收请求且不抛异常。"""
-    pipeline = _make_pipeline(llm_content="Deep answer!")
+    """deep_thinking=True 时，extra_body={"enable_thinking": True} 必须被传入 LLM stream。"""
+    captured_kwargs: dict = {}
 
-    events = []
-    async for e in pipeline.chat(ChatRequest(query="test", conversation_id="c1", deep_thinking=True)):
-        events.append(e)
+    async def capturing_stream(messages, **kwargs):
+        captured_kwargs.update(kwargs)
+        yield LLMEvent(type="content", content="hello")
+        yield LLMEvent(type="done", content="")
 
+    pipeline = _make_pipeline(llm_stream_fn=capturing_stream)
+    req = ChatRequest(query="test", conversation_id="c1", deep_thinking=True)
+    events = [e async for e in pipeline.chat(req)]
     assert any(e.type in ("content", "done") for e in events)
+    assert captured_kwargs.get("extra_body") == {"enable_thinking": True}

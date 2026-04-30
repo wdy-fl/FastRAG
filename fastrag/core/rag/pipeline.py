@@ -1,7 +1,7 @@
 from __future__ import annotations
 import asyncio
 import time
-from typing import AsyncIterator
+from typing import Any, AsyncIterator
 from fastrag.core.models.chat import ChatEvent, ChatRequest, GuidanceEvent, LLMEvent
 from fastrag.core.rag.memory import SlidingWindowMemory
 from fastrag.core.rag.rewrite import LLMQueryRewriter
@@ -67,7 +67,7 @@ class RAGPipeline:
                 request.query, history, retrieved, list(intents)
             )
 
-            extra_kwargs: dict = {}
+            extra_kwargs: dict[str, Any] = {}
             if request.deep_thinking:
                 extra_kwargs["extra_body"] = {"enable_thinking": True}
             async for event in self._llm.stream(prompt, **extra_kwargs):
