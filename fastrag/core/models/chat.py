@@ -1,6 +1,6 @@
 from __future__ import annotations
 from typing import Any, Literal, Union
-from pydantic import BaseModel
+from pydantic import BaseModel, model_validator
 from fastrag.core.models.intent import IntentResult
 
 
@@ -29,6 +29,12 @@ class LLMEvent(BaseModel):
     type: Literal["content", "thinking", "done"]
     content: str = ""
     title: str | None = None             # 新增，仅 done 时携带
+
+    @model_validator(mode="after")
+    def title_only_on_done(self) -> "LLMEvent":
+        if self.title is not None and self.type != "done":
+            raise ValueError("title is only allowed on type='done' events")
+        return self
 
 
 class GuidanceEvent(BaseModel):

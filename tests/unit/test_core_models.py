@@ -1,11 +1,13 @@
 import pytest
+from pydantic import ValidationError
 from fastrag.core.models.intent import IntentNode, IntentResult
 from fastrag.core.models.knowledge import (
     KnowledgeBase, Document, DocumentChunk, ChunkWithEmbedding,
 )
 from fastrag.core.models.chat import (
     ChatRequest, ChatMessage, ConversationHistory,
-    LLMEvent, GuidanceEvent, RetrievedChunk,
+    LLMEvent, GuidanceEvent, MetaEvent, RetrievedChunk,
+    ChatEvent,
 )
 from fastrag.core.models.ingestion import (
     IngestionConfig, IngestionContext, NodeResult,
@@ -116,7 +118,6 @@ def test_chat_request_deep_thinking_can_be_true():
 
 
 def test_meta_event_has_task_id():
-    from fastrag.core.models.chat import MetaEvent
     e = MetaEvent(task_id="abc-123")
     assert e.type == "meta"
     assert e.task_id == "abc-123"
@@ -125,3 +126,8 @@ def test_meta_event_has_task_id():
 def test_done_event_has_title():
     e = LLMEvent(type="done", content="", title="测试标题")
     assert e.title == "测试标题"
+
+
+def test_title_only_on_done_raises():
+    with pytest.raises(ValidationError):
+        LLMEvent(type="content", title="oops")
