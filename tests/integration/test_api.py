@@ -80,3 +80,49 @@ def test_delete_conversation_returns_204():
     client = TestClient(app)
     resp = client.delete("/conversations/c1")
     assert resp.status_code == 204
+
+
+# ---------------------------------------------------------------------------
+# Knowledge Base & Ingestion tests
+# ---------------------------------------------------------------------------
+
+def test_create_knowledge_base_returns_201():
+    from fastrag.main import app
+    from fastrag.api import deps
+    mock_repo = AsyncMock()
+    kb_mock = MagicMock()
+    kb_mock.id = "kb1"
+    kb_mock.name = "Finance KB"
+    kb_mock.description = ""
+    mock_repo.create_knowledge_base = AsyncMock(return_value=kb_mock)
+    app.dependency_overrides[deps.get_knowledge_repo] = lambda: mock_repo
+    client = TestClient(app)
+    resp = client.post(
+        "/knowledge-bases",
+        json={"name": "Finance KB", "description": "", "ingestion_config": {}},
+    )
+    assert resp.status_code == 201
+    assert resp.json()["id"] == "kb1"
+
+
+def test_trigger_ingestion_returns_202():
+    from fastrag.main import app
+    from fastrag.api import deps
+    mock_repo = AsyncMock()
+    mock_repo.create_document = AsyncMock(
+        return_value=MagicMock(id="doc1", status="pending")
+    )
+    mock_engine = MagicMock()
+    mock_engine.execute = AsyncMock(return_value=MagicMock(node_results=[]))
+    app.dependency_overrides[deps.get_knowledge_repo] = lambda: mock_repo
+    app.dependency_overrides[deps.get_ingestion_engine] = lambda: mock_engine
+    client = TestClient(app)
+    resp = client.post(
+        "/knowledge-bases/kb1/documents",
+        json={
+            "filename": "report.pdf",
+            "source_type": "local",
+            "source_uri": "/tmp/report.pdf",
+        },
+    )
+    assert resp.status_code == 202

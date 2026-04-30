@@ -3,7 +3,7 @@ from uuid import uuid4
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from fastrag.db.models.knowledge import (
-    KnowledgeDocumentORM, KnowledgeChunkORM
+    KnowledgeBaseORM, KnowledgeDocumentORM, KnowledgeChunkORM
 )
 
 
@@ -59,4 +59,46 @@ class KnowledgeRepo:
             .order_by(KnowledgeChunkORM.chunk_index)
         )
         result = await self._session.execute(stmt)
+        return list(result.scalars().all())
+
+    async def create_knowledge_base(
+        self,
+        name: str,
+        description: str,
+        ingestion_config: dict,
+    ) -> KnowledgeBaseORM:
+        kb = KnowledgeBaseORM(
+            id=str(uuid4()),
+            name=name,
+            description=description,
+            ingestion_config=ingestion_config,
+        )
+        self._session.add(kb)
+        await self._session.commit()
+        await self._session.refresh(kb)
+        return kb
+
+    async def list_knowledge_bases(self) -> list[KnowledgeBaseORM]:
+        result = await self._session.execute(select(KnowledgeBaseORM))
+        return list(result.scalars().all())
+
+    async def get_knowledge_base(self, kb_id: str) -> KnowledgeBaseORM | None:
+        result = await self._session.execute(
+            select(KnowledgeBaseORM).where(KnowledgeBaseORM.id == kb_id)
+        )
+        return result.scalar_one_or_none()
+
+    async def delete_knowledge_base(self, kb_id: str) -> None:
+        from sqlalchemy import delete
+        await self._session.execute(
+            delete(KnowledgeBaseORM).where(KnowledgeBaseORM.id == kb_id)
+        )
+        await self._session.commit()
+
+    async def list_documents(self, kb_id: str) -> list[KnowledgeDocumentORM]:
+        result = await self._session.execute(
+            select(KnowledgeDocumentORM).where(
+                KnowledgeDocumentORM.knowledge_base_id == kb_id
+            )
+        )
         return list(result.scalars().all())
