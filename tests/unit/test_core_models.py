@@ -103,3 +103,25 @@ def test_ingestion_context_fields():
     ctx = IngestionContext(pipeline_id="p1", task_id="t1", config=cfg)
     assert ctx.chunks == []
     assert ctx.node_results == []
+
+
+def test_chat_request_deep_thinking_default_false():
+    req = ChatRequest(query="hello", conversation_id="c1")
+    assert req.deep_thinking is False
+
+
+def test_chat_request_deep_thinking_can_be_true():
+    req = ChatRequest(query="hello", conversation_id="c1", deep_thinking=True)
+    assert req.deep_thinking is True
+
+
+def test_meta_event_has_task_id():
+    from fastrag.core.models.chat import MetaEvent
+    e = MetaEvent(task_id="abc-123")
+    assert e.type == "meta"
+    assert e.task_id == "abc-123"
+
+
+def test_done_event_has_title():
+    e = LLMEvent(type="done", content="", title="测试标题")
+    assert e.title == "测试标题"

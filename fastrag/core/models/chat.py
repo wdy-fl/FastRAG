@@ -7,6 +7,7 @@ from fastrag.core.models.intent import IntentResult
 class ChatRequest(BaseModel):
     query: str
     conversation_id: str
+    deep_thinking: bool = False          # 新增
 
 
 class ChatMessage(BaseModel):
@@ -19,9 +20,15 @@ class ConversationHistory(BaseModel):
     summary: str | None = None
 
 
+class MetaEvent(BaseModel):              # 新增
+    type: Literal["meta"] = "meta"
+    task_id: str
+
+
 class LLMEvent(BaseModel):
     type: Literal["content", "thinking", "done"]
     content: str = ""
+    title: str | None = None             # 新增，仅 done 时携带
 
 
 class GuidanceEvent(BaseModel):
@@ -36,4 +43,4 @@ class RetrievedChunk(BaseModel):
     document_id: str | None = None
 
 
-ChatEvent = Union[LLMEvent, GuidanceEvent]
+ChatEvent = Union[MetaEvent, LLMEvent, GuidanceEvent]
