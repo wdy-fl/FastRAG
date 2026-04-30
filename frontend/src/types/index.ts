@@ -1,49 +1,71 @@
-export type Role = "user" | "assistant";
+// FastRAG 核心类型定义
 
-export type FeedbackValue = "like" | "dislike" | null;
-
-export type MessageStatus = "streaming" | "done" | "cancelled" | "error";
-
-export interface User {
-  userId: string;
-  username?: string;
-  role: string;
-  token: string;
-  avatar?: string;
+export interface KnowledgeBase {
+  id: string;
+  name: string;
+  description: string;
+  created_at: string;
 }
 
-export type CurrentUser = Omit<User, "token">;
+export interface Document {
+  id: string;
+  knowledge_base_id: string;
+  filename: string;
+  source_type: string;
+  source_uri: string;
+  status: "processing" | "done" | "failed";
+  chunk_count: number;
+  created_at: string;
+}
 
-export interface Session {
+export interface Conversation {
   id: string;
   title: string;
-  lastTime?: string;
+  created_at: string;
+  updated_at: string;
 }
 
 export interface Message {
   id: string;
-  role: Role;
+  conversation_id: string;
+  role: "user" | "assistant";
   content: string;
   thinking?: string;
-  thinkingDuration?: number;
+  status?: "pending" | "streaming" | "done" | "error" | "cancelled";
+  created_at: string;
+}
+
+export interface TraceRun {
+  id: string;
+  conversation_id: string;
+  query: string;
+  status: "running" | "success" | "failed";
+  total_duration_ms: number;
+  created_at: string;
+}
+
+export interface IntentNode {
+  id: string;
+  name: string;
+  level: number;
+  parent_id: string | null;
+  intent_type: string;
+  keywords: string[];
+  description: string;
+}
+
+export interface Mapping {
+  id: string;
+  source_term: string;
+  target_term: string;
+  knowledge_base_id: string;
+  created_at: string;
+}
+
+// 客户端专用（不对应后端模型）
+export interface ClientMessage extends Message {
   isDeepThinking?: boolean;
   isThinking?: boolean;
-  createdAt?: string;
-  feedback?: FeedbackValue;
-  status?: MessageStatus;
-}
-
-export interface StreamMetaPayload {
-  conversationId: string;
-  taskId: string;
-}
-
-export interface MessageDeltaPayload {
-  type: string;
-  delta: string;
-}
-
-export interface CompletionPayload {
-  messageId?: string | null;
-  title?: string | null;
+  thinkingDurationMs?: number;
+  guidance?: unknown;
 }
