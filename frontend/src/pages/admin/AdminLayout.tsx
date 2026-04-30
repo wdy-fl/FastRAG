@@ -8,7 +8,6 @@ import {
   ChevronsRight,
   Database,
   GitBranch,
-  Github,
   Menu,
   MessageSquare,
   Search,
@@ -51,7 +50,6 @@ export function AdminLayout() {
   const location = useLocation();
   const navigate = useNavigate();
   const [collapsed, setCollapsed] = useState(false);
-  const [starCount, setStarCount] = useState<number | null>(null);
   const [kbQuery, setKbQuery] = useState("");
 
   const breadcrumbs = useMemo(() => {
@@ -81,13 +79,6 @@ export function AdminLayout() {
 
     return items;
   }, [location.pathname]);
-
-  const starLabel = useMemo(() => {
-    if (starCount === null) return "--";
-    if (starCount < 1000) return String(starCount);
-    const rounded = Math.round((starCount / 1000) * 10) / 10;
-    return `${String(rounded).replace(/\.0$/, "")}k`;
-  }, [starCount]);
 
   const isLeafActive = (path: string) =>
     location.pathname === path || location.pathname.startsWith(`${path}/`);
@@ -206,19 +197,6 @@ export function AdminLayout() {
                 <MessageSquare className="h-4 w-4" />
                 返回聊天
               </Button>
-              <a
-                href="https://github.com/nageoffer/fastrag"
-                target="_blank"
-                rel="noreferrer"
-                className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-sm text-slate-600 transition hover:bg-slate-100 hover:text-slate-900"
-                aria-label="打开 GitHub 仓库"
-              >
-                <Github className="h-4 w-4" />
-                <span className="font-medium">Star</span>
-                <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs text-slate-600">
-                  {starLabel}
-                </span>
-              </a>
             </div>
           </div>
         </header>
