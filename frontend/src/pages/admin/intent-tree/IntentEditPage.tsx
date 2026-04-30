@@ -7,152 +7,49 @@ import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Checkbox } from "@/components/ui/checkbox";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue
-} from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import {
-  getIntentTree,
-  updateIntentNode,
-  type IntentNodeTree,
-  type IntentNodeUpdatePayload
-} from "@/services/intentTreeService";
+import { intentTreeService } from "@/services/intentTreeService";
+import type { IntentNode } from "@/types";
 import { getErrorMessage } from "@/utils/error";
 
-const ROOT_PARENT = "__ROOT__";
-
-const LEVEL_OPTIONS = [
-  { value: 0, label: "DOMAIN", description: "顶层领域" },
-  { value: 1, label: "CATEGORY", description: "业务分类" },
-  { value: 2, label: "TOPIC", description: "具体主题" }
-];
-
-const KIND_OPTIONS = [
-  { value: 0, label: "KB", description: "知识库检索" },
-  { value: 1, label: "SYSTEM", description: "系统交互" },
-  { value: 2, label: "MCP", description: "工具调用" }
-];
-
 const formSchema = z.object({
-  name: z.string().min(1, "请输入节点名称").max(50, "名称不能超过50个字符"),
-  intentCode: z.string().min(1, "意图标识不能为空"),
-  level: z.number(),
-  kind: z.number(),
-  parentCode: z.string().optional(),
-  collectionName: z.string().optional(),
-  mcpToolId: z.string().optional(),
-  description: z.string().optional(),
-  examplesText: z.string().optional(),
-  topK: z.number().int().positive("TopK 必须大于 0").optional(),
-  sortOrder: z.number().int().optional(),
-  enabled: z.boolean(),
-  promptSnippet: z.string().optional(),
-  promptTemplate: z.string().optional(),
-  paramPromptTemplate: z.string().optional()
+  name: z.string().min(1, "请输入节点名称").max(100, "名称不能超过100个字符"),
+  level: z.number().int().min(0, "层级不能为负数"),
+  parent_id: z.string().optional(),
+  intent_type: z.string().min(1, "请输入意图类型"),
+  keywords: z.string().optional(),
+  description: z.string().optional()
 });
 
 type FormValues = z.infer<typeof formSchema>;
 
-type FlatIntentNode = {
-  id: number;
-  intentCode: string;
-  name: string;
-  level: number;
-  kind: number;
-  parentCode?: string | null;
-  description?: string | null;
-  examples?: string | null;
-  collectionName?: string | null;
-  mcpToolId?: string | null;
-  topK?: number | null;
-  enabled: number;
-  sortOrder: number;
-  promptSnippet?: string | null;
-  promptTemplate?: string | null;
-  paramPromptTemplate?: string | null;
-  pathText: string;
-};
-
-const parseExamples = (value?: string | null) => {
-  if (!value) return [];
-  try {
-    const parsed = JSON.parse(value);
-    if (Array.isArray(parsed)) {
-      return parsed.map((item) => String(item)).filter(Boolean);
-    }
-  } catch {
-    // Ignore parse errors and fall back to plain text parsing.
-  }
-  return value
-    .split("\n")
-    .map((item) => item.trim())
-    .filter(Boolean);
-};
-
-const flattenIntentTree = (
-  nodes: IntentNodeTree[],
-  parentPath: string[] = []
-): FlatIntentNode[] => {
-  const result: FlatIntentNode[] = [];
-  nodes.forEach((node) => {
-    const currentPath = [...parentPath, node.name];
-    const children = node.children || [];
-    result.push({
-      id: node.id,
-      intentCode: node.intentCode,
-      name: node.name,
-      level: node.level ?? 0,
-      kind: node.kind ?? 0,
-      parentCode: node.parentCode,
-      description: node.description,
-      examples: node.examples,
-      collectionName: node.collectionName,
-      mcpToolId: node.mcpToolId,
-      topK: node.topK,
-      enabled: node.enabled === 0 ? 0 : 1,
-      sortOrder: node.sortOrder ?? 0,
-      promptSnippet: node.promptSnippet,
-      promptTemplate: node.promptTemplate,
-      paramPromptTemplate: node.paramPromptTemplate,
-      pathText: currentPath.join(" > ")
-    });
-    result.push(...flattenIntentTree(children, currentPath));
-  });
-  return result;
-};
-
 const emptyDefaults: FormValues = {
   name: "",
-  intentCode: "",
   level: 0,
-  kind: 0,
-  parentCode: ROOT_PARENT,
-  collectionName: "",
-  mcpToolId: "",
-  description: "",
-  examplesText: "",
-  topK: undefined,
-  sortOrder: 0,
-  enabled: true,
-  promptSnippet: "",
-  promptTemplate: "",
-  paramPromptTemplate: ""
+  parent_id: "",
+  intent_type: "classify",
+  keywords: "",
+  description: ""
 };
+
+const nodeToFormValues = (node: IntentNode): FormValues => ({
+  name: node.name || "",
+  level: node.level ?? 0,
+  parent_id: node.parent_id || "",
+  intent_type: node.intent_type || "classify",
+  keywords: (node.keywords || []).join(", "),
+  description: node.description || ""
+});
 
 export function IntentEditPage() {
   const navigate = useNavigate();
   const { id: routeId } = useParams<{ id: string }>();
   const [searchParams] = useSearchParams();
-  const [tree, setTree] = useState<IntentNodeTree[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
+  const isEdit = Boolean(routeId && routeId !== "new");
 
   const returnTo = useMemo(() => {
     const from = searchParams.get("from") || "";
@@ -162,83 +59,24 @@ export function IntentEditPage() {
     return "/admin/intent-list";
   }, [searchParams]);
 
-  const rows = useMemo(() => flattenIntentTree(tree), [tree]);
-
-  const currentNode = useMemo(() => {
-    if (!routeId) return null;
-    return rows.find((row) => String(row.id) === routeId) || null;
-  }, [rows, routeId]);
-
-  const excludedCodes = useMemo(() => {
-    if (!currentNode) return new Set<string>();
-    const childrenMap = new Map<string, string[]>();
-    rows.forEach((row) => {
-      if (!row.parentCode) return;
-      const next = childrenMap.get(row.parentCode) || [];
-      next.push(row.intentCode);
-      childrenMap.set(row.parentCode, next);
-    });
-
-    const excluded = new Set<string>([currentNode.intentCode]);
-    const stack = [currentNode.intentCode];
-    while (stack.length > 0) {
-      const code = stack.pop();
-      if (!code) continue;
-      const children = childrenMap.get(code) || [];
-      children.forEach((childCode) => {
-        if (!excluded.has(childCode)) {
-          excluded.add(childCode);
-          stack.push(childCode);
-        }
-      });
-    }
-    return excluded;
-  }, [rows, currentNode]);
-
-  const parentOptions = useMemo(() => {
-    return [
-      { value: ROOT_PARENT, label: "ROOT" },
-      ...rows
-        .filter((row) => !excludedCodes.has(row.intentCode))
-        .map((row) => ({
-          value: row.intentCode,
-          label: row.pathText
-        }))
-    ];
-  }, [rows, excludedCodes]);
-
-  const resolvedDefaults = useMemo<FormValues>(() => {
-    if (!currentNode) return emptyDefaults;
-    return {
-      name: currentNode.name || "",
-      intentCode: currentNode.intentCode || "",
-      level: currentNode.level ?? 0,
-      kind: currentNode.kind ?? 0,
-      parentCode: currentNode.parentCode || ROOT_PARENT,
-      collectionName: currentNode.collectionName || "",
-      mcpToolId: currentNode.mcpToolId || "",
-      description: currentNode.description || "",
-      examplesText: parseExamples(currentNode.examples).join("\n"),
-      topK: currentNode.topK ?? undefined,
-      sortOrder: currentNode.sortOrder ?? 0,
-      enabled: currentNode.enabled !== 0,
-      promptSnippet: currentNode.promptSnippet || "",
-      promptTemplate: currentNode.promptTemplate || "",
-      paramPromptTemplate: currentNode.paramPromptTemplate || ""
-    };
-  }, [currentNode]);
-
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
     defaultValues: emptyDefaults
   });
 
   useEffect(() => {
-    const loadTree = async () => {
+    if (!isEdit || !routeId) return;
+    const loadNode = async () => {
       try {
         setLoading(true);
-        const data = await getIntentTree();
-        setTree(data || []);
+        const res = await intentTreeService.listNodes();
+        const node = (res.data || []).find((n) => n.id === routeId);
+        if (node) {
+          form.reset(nodeToFormValues(node));
+        } else {
+          toast.error("未找到对应意图节点");
+          navigate(returnTo);
+        }
       } catch (error) {
         toast.error(getErrorMessage(error, "加载意图节点失败"));
         console.error(error);
@@ -246,54 +84,38 @@ export function IntentEditPage() {
         setLoading(false);
       }
     };
-    loadTree();
-  }, []);
-
-  useEffect(() => {
-    form.reset(resolvedDefaults);
-  }, [resolvedDefaults, form]);
-
-  const kind = form.watch("kind");
+    loadNode();
+  }, [isEdit, routeId, form, navigate, returnTo]);
 
   const handleSubmit = async (values: FormValues) => {
-    if (!currentNode) return;
-    if (values.kind === 2 && !values.mcpToolId?.trim()) {
-      form.setError("mcpToolId", { message: "MCP节点必须填写工具ID" });
-      return;
-    }
-
-    const parentCode = values.parentCode === ROOT_PARENT ? null : values.parentCode || null;
-    const examples = values.examplesText
-      ? values.examplesText
-          .split("\n")
-          .map((item) => item.trim())
+    const keywords = values.keywords
+      ? values.keywords
+          .split(",")
+          .map((k) => k.trim())
           .filter(Boolean)
       : [];
 
-    const payload: IntentNodeUpdatePayload = {
+    const payload = {
       name: values.name.trim(),
       level: values.level,
-      parentCode,
-      description: values.description?.trim() || "",
-      examples,
-      collectionName: values.kind === 0 ? values.collectionName?.trim() || "" : "",
-      mcpToolId: values.kind === 2 ? values.mcpToolId?.trim() || "" : "",
-      kind: values.kind,
-      topK: values.topK ?? undefined,
-      sortOrder: values.sortOrder ?? 0,
-      enabled: values.enabled ? 1 : 0,
-      promptSnippet: values.promptSnippet?.trim() || "",
-      promptTemplate: values.promptTemplate?.trim() || "",
-      paramPromptTemplate: values.kind === 2 ? values.paramPromptTemplate?.trim() || "" : ""
+      parent_id: values.parent_id?.trim() || null,
+      intent_type: values.intent_type.trim(),
+      keywords,
+      description: values.description?.trim() || ""
     };
 
     try {
       setSaving(true);
-      await updateIntentNode(currentNode.id, payload);
-      toast.success("更新成功");
+      if (isEdit && routeId) {
+        await intentTreeService.updateNode(routeId, payload);
+        toast.success("更新成功");
+      } else {
+        await intentTreeService.createNode(payload as Omit<IntentNode, "id">);
+        toast.success("创建成功");
+      }
       navigate(returnTo);
     } catch (error) {
-      toast.error(getErrorMessage(error, "更新失败"));
+      toast.error(getErrorMessage(error, isEdit ? "更新失败" : "创建失败"));
       console.error(error);
     } finally {
       setSaving(false);
@@ -310,28 +132,13 @@ export function IntentEditPage() {
     );
   }
 
-  if (!currentNode) {
-    return (
-      <div className="admin-page">
-        <Card>
-          <CardContent className="space-y-3 py-12 text-center">
-            <p className="text-sm text-muted-foreground">未找到对应意图节点</p>
-            <Button variant="outline" onClick={() => navigate(returnTo)}>
-              返回意图列表
-            </Button>
-          </CardContent>
-        </Card>
-      </div>
-    );
-  }
-
   return (
     <div className="admin-page">
       <div className="admin-page-header">
         <div>
-          <h1 className="admin-page-title">编辑意图节点</h1>
+          <h1 className="admin-page-title">{isEdit ? "编辑意图节点" : "新增意图节点"}</h1>
           <p className="admin-page-subtitle">
-            {currentNode.name}（{currentNode.intentCode}）
+            {isEdit ? "修改节点基础信息" : "创建新的意图节点"}
           </p>
         </div>
         <div className="admin-page-actions">
@@ -344,7 +151,7 @@ export function IntentEditPage() {
       <Card>
         <CardHeader>
           <CardTitle>节点配置</CardTitle>
-          <CardDescription>修改节点基础信息、Prompt与高级参数</CardDescription>
+          <CardDescription>填写意图节点的基础信息</CardDescription>
         </CardHeader>
         <CardContent>
           <Form {...form}>
@@ -366,12 +173,21 @@ export function IntentEditPage() {
 
                 <FormField
                   control={form.control}
-                  name="intentCode"
+                  name="level"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>意图标识</FormLabel>
+                      <FormLabel>层级</FormLabel>
                       <FormControl>
-                        <Input {...field} disabled />
+                        <Input
+                          type="number"
+                          min={0}
+                          placeholder="例如：0"
+                          value={field.value ?? ""}
+                          onChange={(event) => {
+                            const value = event.target.value;
+                            field.onChange(value === "" ? 0 : Number(value));
+                          }}
+                        />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -382,24 +198,13 @@ export function IntentEditPage() {
               <div className="grid gap-4 md:grid-cols-2">
                 <FormField
                   control={form.control}
-                  name="level"
+                  name="intent_type"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>层级</FormLabel>
-                      <Select value={String(field.value)} onValueChange={(value) => field.onChange(Number(value))}>
-                        <FormControl>
-                          <SelectTrigger>
-                            <SelectValue placeholder="选择层级" />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          {LEVEL_OPTIONS.map((option) => (
-                            <SelectItem key={option.value} value={String(option.value)}>
-                              {option.label} - {option.description}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+                      <FormLabel>意图类型</FormLabel>
+                      <FormControl>
+                        <Input placeholder="例如：classify" {...field} />
+                      </FormControl>
                       <FormMessage />
                     </FormItem>
                   )}
@@ -407,24 +212,13 @@ export function IntentEditPage() {
 
                 <FormField
                   control={form.control}
-                  name="kind"
+                  name="parent_id"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>类型</FormLabel>
-                      <Select value={String(field.value)} onValueChange={(value) => field.onChange(Number(value))}>
-                        <FormControl>
-                          <SelectTrigger>
-                            <SelectValue placeholder="选择类型" />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          {KIND_OPTIONS.map((option) => (
-                            <SelectItem key={option.value} value={String(option.value)}>
-                              {option.label} - {option.description}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+                      <FormLabel>父节点 ID（可选）</FormLabel>
+                      <FormControl>
+                        <Input placeholder="留空表示根节点" {...field} />
+                      </FormControl>
                       <FormMessage />
                     </FormItem>
                   )}
@@ -433,214 +227,38 @@ export function IntentEditPage() {
 
               <FormField
                 control={form.control}
-                name="parentCode"
+                name="keywords"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>父节点</FormLabel>
-                    <Select value={field.value || ROOT_PARENT} onValueChange={field.onChange}>
-                      <FormControl>
-                        <SelectTrigger>
-                          <SelectValue placeholder="选择父节点" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        {parentOptions.map((option) => (
-                          <SelectItem key={option.value} value={option.value}>
-                            {option.label}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                    <FormLabel>关键词（逗号分隔）</FormLabel>
+                    <FormControl>
+                      <Input placeholder="例如：请假, 审批, OA" {...field} />
+                    </FormControl>
                     <FormMessage />
                   </FormItem>
                 )}
               />
 
-              {kind === 0 ? (
-                <FormField
-                  control={form.control}
-                  name="collectionName"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Collection 名称</FormLabel>
-                      <FormControl>
-                        <Input placeholder="Milvus Collection 名称" {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              ) : null}
-
-              {kind === 2 ? (
-                <FormField
-                  control={form.control}
-                  name="mcpToolId"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>MCP 工具ID（必填）</FormLabel>
-                      <FormControl>
-                        <Input placeholder="例如：sales_query" {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              ) : null}
-
-              <details className="rounded-lg border px-4 py-3" open>
-                <summary className="cursor-pointer text-sm font-medium text-foreground">描述与示例</summary>
-                <div className="mt-3 space-y-4">
-                  <FormField
-                    control={form.control}
-                    name="description"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>描述</FormLabel>
-                        <FormControl>
-                          <Textarea placeholder="节点语义说明与适用场景" {...field} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-
-                  <FormField
-                    control={form.control}
-                    name="examplesText"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>示例问题</FormLabel>
-                        <FormControl>
-                          <Textarea placeholder="每行一个示例问题" {...field} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                </div>
-              </details>
-
-              <details className="rounded-lg border px-4 py-3">
-                <summary className="cursor-pointer text-sm font-medium text-foreground">Prompt 配置</summary>
-                <div className="mt-3 space-y-4">
-                  <FormField
-                    control={form.control}
-                    name="promptSnippet"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>短规则片段（可选）</FormLabel>
-                        <FormControl>
-                          <Textarea rows={3} placeholder="多意图场景下的规则补充" {...field} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-
-                  <FormField
-                    control={form.control}
-                    name="promptTemplate"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Prompt 模板（可选）</FormLabel>
-                        <FormControl>
-                          <Textarea rows={4} placeholder="场景专属完整提示词模板" {...field} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-
-                  {kind === 2 ? (
-                    <FormField
-                      control={form.control}
-                      name="paramPromptTemplate"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>参数提取提示词模板（MCP专属）</FormLabel>
-                          <FormControl>
-                            <Textarea rows={4} placeholder="用于提取MCP工具参数" {...field} />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                  ) : null}
-                </div>
-              </details>
-
-              <details className="rounded-lg border px-4 py-3">
-                <summary className="cursor-pointer text-sm font-medium text-foreground">高级设置</summary>
-                <div className="mt-3 grid gap-4 md:grid-cols-2">
-                  <FormField
-                    control={form.control}
-                    name="topK"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>节点 TopK（可选）</FormLabel>
-                        <FormControl>
-                          <Input
-                            type="number"
-                            min={1}
-                            placeholder="留空则使用全局 TopK"
-                            value={field.value ?? ""}
-                            onChange={(event) => {
-                              const value = event.target.value;
-                              field.onChange(value === "" ? undefined : Number(value));
-                            }}
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-
-                  <FormField
-                    control={form.control}
-                    name="sortOrder"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>排序</FormLabel>
-                        <FormControl>
-                          <Input
-                            type="number"
-                            value={field.value ?? ""}
-                            onChange={(event) => {
-                              const value = event.target.value;
-                              field.onChange(value === "" ? undefined : Number(value));
-                            }}
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-
-                  <FormField
-                    control={form.control}
-                    name="enabled"
-                    render={({ field }) => (
-                      <FormItem className="flex flex-col justify-end">
-                        <div className="flex items-center gap-2">
-                          <FormControl>
-                            <Checkbox checked={field.value} onCheckedChange={(value) => field.onChange(value === true)} />
-                          </FormControl>
-                          <FormLabel className="!m-0">节点启用</FormLabel>
-                        </div>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                </div>
-              </details>
+              <FormField
+                control={form.control}
+                name="description"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>描述（可选）</FormLabel>
+                    <FormControl>
+                      <Textarea placeholder="节点语义说明与适用场景" rows={4} {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
 
               <div className="flex justify-end gap-2 pt-2">
                 <Button type="button" variant="outline" onClick={() => navigate(returnTo)} disabled={saving}>
                   取消
                 </Button>
                 <Button type="submit" className="admin-primary-gradient" disabled={saving}>
-                  {saving ? "保存中..." : "保存修改"}
+                  {saving ? "保存中..." : isEdit ? "保存修改" : "创建节点"}
                 </Button>
               </div>
             </form>
