@@ -1,27 +1,20 @@
 import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from "react";
 import { Link, Outlet, useLocation, useNavigate } from "react-router-dom";
 import {
+  Activity,
+  ArrowLeftRight,
   ChevronDown,
   ChevronRight,
   ChevronsLeft,
   ChevronsRight,
-  ClipboardList,
   Database,
   GitBranch,
   Github,
-  Layers,
-  LayoutDashboard,
-  Lightbulb,
   LogOut,
   Menu,
   MessageSquare,
   KeyRound,
   Search,
-  Settings,
-  Upload,
-  Users,
-  FolderKanban,
-  Workflow
 } from "lucide-react";
 import { useAuthStore } from "@/stores/authStore";
 import { Button } from "@/components/ui/button";
@@ -71,92 +64,34 @@ const menuGroups: MenuGroup[] = [
     title: "导航",
     items: [
       {
-        path: "/admin/dashboard",
-        label: "Dashboard",
-        icon: LayoutDashboard
-      },
-      {
         path: "/admin/knowledge",
         label: "知识库管理",
         icon: Database
       },
       {
-        id: "intent",
-        path: "/admin/intent-tree",
-        label: "意图管理",
-        icon: Layers,
-        children: [
-          {
-            path: "/admin/intent-tree",
-            label: "意图树配置",
-            icon: GitBranch
-          },
-          {
-            path: "/admin/intent-list",
-            label: "意图列表",
-            icon: ClipboardList
-          }
-        ]
-      },
-      {
-        id: "ingestion",
-        path: "/admin/ingestion",
-        label: "数据通道",
-        icon: Upload,
-        children: [
-          {
-            path: "/admin/ingestion",
-            label: "流水线管理",
-            icon: FolderKanban,
-            search: "?tab=pipelines"
-          },
-          {
-            path: "/admin/ingestion",
-            label: "流水线任务",
-            icon: ClipboardList,
-            search: "?tab=tasks"
-          }
-        ]
+        path: "/admin/intent-list",
+        label: "Intent 管理",
+        icon: GitBranch
       },
       {
         path: "/admin/traces",
-        label: "链路追踪",
-        icon: Workflow
-      },
-    ]
-  },
-  {
-    title: "设置",
-    items: [
-      {
-        path: "/admin/users",
-        label: "用户管理",
-        icon: Users
+        label: "Trace 日志",
+        icon: Activity
       },
       {
-        path: "/admin/sample-questions",
-        label: "示例问题",
-        icon: Lightbulb
-      },
-      {
-        path: "/admin/settings",
-        label: "系统设置",
-        icon: Settings
+        path: "/admin/mapping",
+        label: "查询词映射",
+        icon: ArrowLeftRight
       },
     ]
   }
 ];
 
 const breadcrumbMap: Record<string, string> = {
-  dashboard: "Dashboard",
   knowledge: "知识库管理",
-  "intent-tree": "意图树配置",
-  "intent-list": "意图列表",
-  ingestion: "数据通道",
-  traces: "链路追踪",
-  "sample-questions": "示例问题",
-  settings: "系统设置",
-  users: "用户管理"
+  "intent-list": "Intent 管理",
+  traces: "Trace 日志",
+  mapping: "查询词映射"
 };
 
 export function AdminLayout() {
@@ -250,45 +185,27 @@ export function AdminLayout() {
   const breadcrumbs = useMemo(() => {
     const segments = location.pathname.split("/").filter(Boolean);
     const items: { label: string; to?: string }[] = [
-      { label: "首页", to: "/admin/dashboard" }
+      { label: "首页", to: "/admin/knowledge" }
     ];
 
     if (segments[0] !== "admin") return items;
     const section = segments[1];
     if (section) {
-      if (section === "intent-tree" || section === "intent-list") {
-        items.push({
-          label: "意图管理",
-          to: "/admin/intent-tree"
-        });
-        if (section === "intent-list" && segments.includes("edit")) {
+      if (section === "intent-list") {
+        if (segments.includes("edit")) {
           items.push({
             label: breadcrumbMap[section] || section,
             to: "/admin/intent-list"
           });
-          items.push({
-            label: "编辑节点"
-          });
+          items.push({ label: "编辑节点" });
         } else {
-          items.push({
-            label: breadcrumbMap[section] || section
-          });
+          items.push({ label: breadcrumbMap[section] || section });
         }
       } else {
         items.push({
           label: breadcrumbMap[section] || section,
           to: `/admin/${section}`
         });
-      }
-    }
-
-    if (section === "ingestion") {
-      const searchParams = new URLSearchParams(location.search);
-      const tab = searchParams.get("tab");
-      if (tab === "tasks") {
-        items.push({ label: "流水线任务" });
-      } else if (tab === "pipelines") {
-        items.push({ label: "流水线管理" });
       }
     }
 
@@ -301,11 +218,11 @@ export function AdminLayout() {
     }
 
     if (section === "traces" && segments.length > 2) {
-      items.push({ label: "链路详情" });
+      items.push({ label: "Trace 详情" });
     }
 
     return items;
-  }, [location.pathname, location.search]);
+  }, [location.pathname]);
 
   const avatarUrl = user?.avatar?.trim();
   const showAvatar = Boolean(avatarUrl);
