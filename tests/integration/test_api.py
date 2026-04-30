@@ -1,3 +1,4 @@
+import json
 import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
 from fastapi.testclient import TestClient
@@ -8,6 +9,7 @@ def _make_app_with_mock_pipeline():
     from fastrag.main import app
     from fastrag.api import deps
     from fastrag.core.rag.pipeline import RAGPipeline
+    from fastrag.infra.llm.client import OpenAICompatClient
 
     mock_pipeline = MagicMock(spec=RAGPipeline)
 
@@ -17,7 +19,15 @@ def _make_app_with_mock_pipeline():
 
     mock_pipeline.chat = fake_chat
 
+    mock_llm = MagicMock(spec=OpenAICompatClient)
+
+    async def fake_stream(messages, **kwargs):
+        yield LLMEvent(type="content", content="Test title")
+
+    mock_llm.stream = fake_stream
+
     app.dependency_overrides[deps.get_rag_pipeline] = lambda: mock_pipeline
+    app.dependency_overrides[deps.get_llm_provider] = lambda: mock_llm
     return app
 
 
@@ -163,3 +173,43 @@ def test_list_mappings_returns_200():
     client = TestClient(app)
     resp = client.get("/query-term-mappings")
     assert resp.status_code == 200
+
+
+# ---------------------------------------------------------------------------
+# Meta event / stop endpoint tests
+# ---------------------------------------------------------------------------
+
+def test_chat_stream_first_event_is_meta():
+    """流的第一个 data 事件 type 必须是 meta 且含 task_id"""
+    app = _make_app_with_mock_pipeline()
+    client = TestClient(app)
+    resp = client.post(
+        "/chat/stream",
+        json={"query": "hi", "conversation_id": "c1"},
+        headers={"Accept": "text/event-stream"},
+    )
+    assert resp.status_code == 200
+    lines = [l for l in resp.text.split("\n") if l.startswith("data:")]
+    first = json.loads(lines[0][5:])
+    assert first["type"] == "meta"
+    assert "task_id" in first
+    assert isinstance(first["task_id"], str)
+
+
+def test_chat_stop_returns_200():
+    """stop 端点对已知 task_id 返回 200（预先注册 fake task_id）"""
+    app = _make_app_with_mock_pipeline()
+    client = TestClient(app)
+    # 预先向 _task_registry 注册一个 fake task_id，规避 TestClient 同步等待导致流结束后 registry 被清空的问题
+    import fastrag.api.routers.chat as chat_mod
+    fake_task_id = "test-task-id-123"
+    chat_mod._task_registry[fake_task_id] = None  # type: ignore[assignment]
+    stop_resp = client.post("/chat/stop", json={"task_id": fake_task_id})
+    assert stop_resp.status_code == 200
+
+
+def test_chat_stop_unknown_task_id_returns_404():
+    app = _make_app_with_mock_pipeline()
+    client = TestClient(app)
+    resp = client.post("/chat/stop", json={"task_id": "nonexistent-id"})
+    assert resp.status_code == 404
