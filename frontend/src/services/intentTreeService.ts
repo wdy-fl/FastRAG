@@ -1,84 +1,16 @@
-import { api } from "@/services/api";
+import api from "./api";
+import type { IntentNode } from "../types";
 
-export interface IntentNodeTree {
-  id: number;
-  intentCode: string;
-  name: string;
-  level: number;
-  parentCode?: string | null;
-  description?: string | null;
-  examples?: string | null;
-  collectionName?: string | null;
-  mcpToolId?: string | null;
-  topK?: number | null;
-  kind?: number | null;
-  sortOrder?: number | null;
-  enabled?: number | null;
-  promptSnippet?: string | null;
-  promptTemplate?: string | null;
-  paramPromptTemplate?: string | null;
-  children?: IntentNodeTree[];
-}
+const BASE = "/api/fastrag/intent-trees";
 
-export interface IntentNodeCreatePayload {
-  kbId?: string;
-  intentCode: string;
-  name: string;
-  level: number;
-  parentCode?: string | null;
-  description?: string | null;
-  examples?: string[];
-  mcpToolId?: string | null;
-  topK?: number | null;
-  kind?: number | null;
-  sortOrder?: number | null;
-  enabled?: number | null;
-  promptSnippet?: string | null;
-  promptTemplate?: string | null;
-  paramPromptTemplate?: string | null;
-}
+export const intentTreeService = {
+  listNodes: (): Promise<{ data: IntentNode[] }> => api.get(`${BASE}/nodes`),
 
-export interface IntentNodeUpdatePayload {
-  name?: string;
-  level?: number;
-  parentCode?: string | null;
-  description?: string | null;
-  examples?: string[];
-  collectionName?: string | null;
-  mcpToolId?: string | null;
-  topK?: number | null;
-  kind?: number | null;
-  sortOrder?: number | null;
-  enabled?: number | null;
-  promptSnippet?: string | null;
-  promptTemplate?: string | null;
-  paramPromptTemplate?: string | null;
-}
+  createNode: (data: Omit<IntentNode, "id">): Promise<{ data: IntentNode }> =>
+    api.post(`${BASE}/nodes`, data),
 
-export async function getIntentTree() {
-  return api.get<IntentNodeTree[], IntentNodeTree[]>("/intent-tree/trees");
-}
+  updateNode: (id: string, data: Partial<IntentNode>): Promise<{ data: IntentNode }> =>
+    api.put(`${BASE}/nodes/${id}`, data),
 
-export async function createIntentNode(payload: IntentNodeCreatePayload) {
-  return api.post<string, string>("/intent-tree", payload);
-}
-
-export async function updateIntentNode(id: number | string, payload: IntentNodeUpdatePayload) {
-  await api.put(`/intent-tree/${id}`, payload);
-}
-
-export async function deleteIntentNode(id: number | string) {
-  await api.delete(`/intent-tree/${id}`);
-}
-
-export async function batchEnableIntentNodes(ids: number[]) {
-  await api.post("/intent-tree/batch/enable", { ids });
-}
-
-export async function batchDisableIntentNodes(ids: number[]) {
-  await api.post("/intent-tree/batch/disable", { ids });
-}
-
-export async function batchDeleteIntentNodes(ids: number[]) {
-  await api.post("/intent-tree/batch/delete", { ids });
-}
+  deleteNode: (id: string): Promise<void> => api.delete(`${BASE}/nodes/${id}`),
+};

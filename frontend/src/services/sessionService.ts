@@ -1,32 +1,21 @@
-import { api } from "@/services/api";
+import api from "./api";
+import type { Conversation, Message } from "../types";
 
-export interface ConversationVO {
-  conversationId: string;
-  title: string;
-  lastTime?: string;
-}
+const BASE = "/api/fastrag/conversations";
 
-export interface ConversationMessageVO {
-  id: number | string;
-  conversationId: string;
-  role: string;
-  content: string;
-  vote: number | null;
-  createTime?: string;
-}
+export const sessionService = {
+  list: (): Promise<{ data: Conversation[] }> => api.get(BASE),
 
-export async function listSessions() {
-  return api.get<ConversationVO[]>("/conversations");
-}
+  get: (id: string): Promise<{ data: Conversation }> => api.get(`${BASE}/${id}`),
 
-export async function deleteSession(conversationId: string) {
-  return api.delete<void>(`/conversations/${conversationId}`);
-}
+  create: (title?: string): Promise<{ data: Conversation }> =>
+    api.post(BASE, { title: title ?? "新对话" }),
 
-export async function renameSession(conversationId: string, title: string) {
-  return api.put<void>(`/conversations/${conversationId}`, { title });
-}
+  delete: (id: string): Promise<void> => api.delete(`${BASE}/${id}`),
 
-export async function listMessages(conversationId: string) {
-  return api.get<ConversationMessageVO[]>(`/conversations/${conversationId}/messages`);
-}
+  update: (id: string, title: string): Promise<{ data: Conversation }> =>
+    api.put(`${BASE}/${id}`, { title }),
+
+  getMessages: (id: string): Promise<{ data: Message[] }> =>
+    api.get(`${BASE}/${id}/messages`),
+};

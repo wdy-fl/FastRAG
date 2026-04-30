@@ -1,11 +1,11 @@
-import { api } from "@/services/api";
+import api from "./api";
 
-export async function stopTask(taskId: string) {
-  return api.post<void>(`/rag/v3/stop?taskId=${encodeURIComponent(taskId)}`);
-}
+const BASE = "/api/fastrag/chat";
 
-export async function submitFeedback(messageId: string, vote: number) {
-  return api.post<void>(`/conversations/messages/${messageId}/feedback`, {
-    vote
-  });
-}
+export const chatService = {
+  stopTask: (taskId: string): Promise<void> =>
+    api.post(`${BASE}/stop`, { task_id: taskId }),
+
+  submitFeedback: (messageId: string, rating: "up" | "down"): Promise<void> =>
+    api.post(`/api/fastrag/conversations/messages/${messageId}/feedback`, { rating }),
+};
