@@ -189,7 +189,7 @@ export function AdminLayout() {
 
   useEffect(() => {
     let active = true;
-    fetch("https://api.github.com/repos/nageoffer/ragent")
+    fetch("https://api.github.com/repos/nageoffer/fastrag")
       .then((res) => (res.ok ? res.json() : null))
       .then((data) => {
         if (!active) return;
@@ -434,7 +434,7 @@ export function AdminLayout() {
             <div className="admin-sidebar__logo">R</div>
             {!collapsed && (
               <div className="min-w-0">
-                <h1 className="admin-sidebar__title">Ragent 管理后台</h1>
+                <h1 className="admin-sidebar__title">FastRAG 管理后台</h1>
                 <p className="admin-sidebar__subtitle">Knowledge Console</p>
               </div>
             )}
@@ -683,7 +683,7 @@ export function AdminLayout() {
                 返回聊天
               </Button>
               <a
-                href="https://github.com/nageoffer/ragent"
+                href="https://github.com/nageoffer/fastrag"
                 target="_blank"
                 rel="noreferrer"
                 className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-sm text-slate-600 transition hover:bg-slate-100 hover:text-slate-900"

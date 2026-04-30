@@ -1,8 +1,8 @@
 import type { User } from "@/types";
 
-const TOKEN_KEY = "ragent_token";
-const USER_KEY = "ragent_user";
-const THEME_KEY = "ragent_theme";
+const TOKEN_KEY = "fastrag_token";
+const USER_KEY = "fastrag_user";
+const THEME_KEY = "fastrag_theme";
 
 function safeGet(key: string) {
   try {
