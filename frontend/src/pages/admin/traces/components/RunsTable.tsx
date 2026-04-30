@@ -1,23 +1,50 @@
+import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { ChevronRight, Eye } from "lucide-react";
-import type { RagTraceRun } from "@/services/ragTraceService";
-import {
-  formatDateTime,
-  formatDuration,
-  statusBadgeVariant,
-  statusLabel
-} from "@/pages/admin/traces/traceUtils";
+import type { TraceRun } from "@/types";
+
+// ── local helpers (replaced deleted traceUtils) ──────────────────────────────
+
+function formatDuration(ms: number | undefined): string {
+  if (ms == null || !Number.isFinite(ms) || ms <= 0) return "-";
+  if (ms < 1000) return `${Math.round(ms)} ms`;
+  if (ms < 60_000) return `${(ms / 1000).toFixed(2)} s`;
+  return `${(ms / 1000).toFixed(1)} s`;
+}
+
+function formatDateTime(iso: string | undefined): string {
+  if (!iso) return "-";
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "-";
+  return d.toLocaleString("zh-CN", { hour12: false });
+}
+
+type BadgeVariant = "default" | "secondary" | "destructive" | "outline";
+
+function statusBadgeVariant(status: TraceRun["status"]): BadgeVariant {
+  if (status === "success") return "default";
+  if (status === "failed") return "destructive";
+  return "secondary";
+}
+
+function statusLabel(status: TraceRun["status"]): string {
+  if (status === "success") return "成功";
+  if (status === "failed") return "失败";
+  if (status === "running") return "运行中";
+  return status;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 
 interface RunsTableProps {
-  runs: RagTraceRun[];
+  runs: TraceRun[];
   loading: boolean;
   current: number;
   pages: number;
   total: number;
-  onOpenRun: (traceId: string) => void;
   onPrevPage: () => void;
   onNextPage: () => void;
 }
@@ -28,7 +55,6 @@ export function RunsTable({
   current,
   pages,
   total,
-  onOpenRun,
   onPrevPage,
   onNextPage
 }: RunsTableProps) {
@@ -48,10 +74,9 @@ export function RunsTable({
             <Table className="trace-list-table">
               <TableHeader>
                 <TableRow>
-                  <TableHead className="trace-col-trace">Trace Name</TableHead>
                   <TableHead className="trace-col-run-id">Trace Id</TableHead>
-                  <TableHead className="trace-col-meta">会话ID / TaskID</TableHead>
-                  <TableHead className="trace-col-user">用户名</TableHead>
+                  <TableHead className="trace-col-meta">会话ID</TableHead>
+                  <TableHead>Query</TableHead>
                   <TableHead className="trace-col-duration">耗时</TableHead>
                   <TableHead className="trace-col-status">状态</TableHead>
                   <TableHead>执行时间</TableHead>
@@ -60,50 +85,37 @@ export function RunsTable({
               </TableHeader>
               <TableBody>
                 {runs.map((run) => (
-                  <TableRow key={run.traceId} className="trace-list-table-row">
-                    <TableCell className="trace-col-trace">
-                      <div className="trace-list-run-trace">
-                        <p className="trace-list-run-name line-clamp-1" title={run.traceName || "-"}>
-                          {run.traceName || "-"}
-                        </p>
-                      </div>
-                    </TableCell>
+                  <TableRow key={run.id} className="trace-list-table-row">
                     <TableCell className="trace-col-run-id">
-                      <span className="trace-list-run-id" title={run.traceId}>
-                        {run.traceId}
+                      <span className="trace-list-run-id" title={run.id}>
+                        {run.id}
                       </span>
                     </TableCell>
                     <TableCell className="trace-col-meta">
-                      <p className="trace-list-run-meta-line" title={`会话ID: ${run.conversationId || "-"}`}>
-                        {run.conversationId || "-"}
-                      </p>
-                      <p className="trace-list-run-meta-line is-secondary" title={`TaskID: ${run.taskId || "-"}`}>
-                        {run.taskId || "-"}
+                      <p className="trace-list-run-meta-line" title={`会话ID: ${run.conversation_id || "-"}`}>
+                        {run.conversation_id || "-"}
                       </p>
                     </TableCell>
-                    <TableCell className="trace-col-user">
-                      <span
-                        className="trace-list-user-name"
-                        title={run.userName || run.username || run.userId || "-"}
-                      >
-                        {run.userName || run.username || run.userId || "-"}
+                    <TableCell>
+                      <span className="line-clamp-2" title={run.query}>
+                        {run.query}
                       </span>
                     </TableCell>
                     <TableCell className="trace-col-duration trace-list-duration-cell">
-                      {formatDuration(run.durationMs ?? undefined)}
+                      {formatDuration(run.total_duration_ms)}
                     </TableCell>
                     <TableCell className="trace-col-status trace-list-status-cell">
                       <Badge className="trace-list-status-badge" variant={statusBadgeVariant(run.status)}>
                         {statusLabel(run.status)}
                       </Badge>
                     </TableCell>
-                    <TableCell>{formatDateTime(run.startTime ?? undefined)}</TableCell>
+                    <TableCell>{formatDateTime(run.created_at)}</TableCell>
                     <TableCell className="trace-col-action trace-list-action-cell">
                       <Button
                         size="sm"
                         variant="outline"
                         className="trace-list-action-btn"
-                        onClick={() => onOpenRun(run.traceId)}
+                        onClick={() => toast.info("Trace 详情功能开发中")}
                       >
                         <Eye className="h-3.5 w-3.5" />
                         查看链路

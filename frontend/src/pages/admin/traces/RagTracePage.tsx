@@ -1,19 +1,16 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { useNavigate } from "react-router-dom";
 import { Activity, Clock3, Layers, RefreshCw, Search, TrendingUp } from "lucide-react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { getRagTraceRuns, type PageResult, type RagTraceRun } from "@/services/ragTraceService";
+import { ragTraceService } from "@/services/ragTraceService";
+import type { TraceRun } from "@/types";
 import { getErrorMessage } from "@/utils/error";
 import { RunsTable } from "@/pages/admin/traces/components/RunsTable";
 import { StatCard, type StatCardTone } from "@/pages/admin/traces/components/StatCard";
-import {
-  PAGE_SIZE,
-  normalizeStatus,
-  percentile,
-} from "@/pages/admin/traces/traceUtils";
+
+const PAGE_SIZE = 20;
 
 type DurationMetric = {
   value: string;
@@ -32,27 +29,19 @@ const formatDurationMetric = (durationMs: number): DurationMetric => {
 };
 
 export function RagTracePage() {
-  const navigate = useNavigate();
   const runsRequestRef = useRef(0);
-  const [traceIdFilter, setTraceIdFilter] = useState("");
-  const [queryTraceId, setQueryTraceId] = useState("");
+  const [queryFilter, setQueryFilter] = useState("");
   const [pageNo, setPageNo] = useState(1);
-  const [pageData, setPageData] = useState<PageResult<RagTraceRun> | null>(null);
+  const [allRuns, setAllRuns] = useState<TraceRun[]>([]);
   const [loading, setLoading] = useState(false);
 
-  const runs = pageData?.records || [];
-
-  const loadRuns = async (current = pageNo, nextTraceId = queryTraceId) => {
+  const loadRuns = async () => {
     const requestId = ++runsRequestRef.current;
     setLoading(true);
     try {
-      const result = await getRagTraceRuns({
-        current,
-        size: PAGE_SIZE,
-        traceId: nextTraceId.trim() || undefined
-      });
+      const res = await ragTraceService.listRuns();
       if (runsRequestRef.current !== requestId) return;
-      setPageData(result);
+      setAllRuns(res.data);
     } catch (error) {
       if (runsRequestRef.current !== requestId) return;
       toast.error(getErrorMessage(error, "加载链路运行列表失败"));
@@ -65,45 +54,42 @@ export function RagTracePage() {
 
   useEffect(() => {
     loadRuns();
-  }, [pageNo, queryTraceId]);
+  }, []);
 
   const handleSearch = () => {
     setPageNo(1);
-    setQueryTraceId(traceIdFilter.trim());
   };
 
   const handleRefresh = () => {
-    loadRuns(pageNo, queryTraceId);
+    loadRuns();
   };
 
-  const traceStats = useMemo(() => {
-    const durations = runs
-      .map((item) => Number(item.durationMs ?? 0))
-      .filter((value) => Number.isFinite(value) && value > 0);
-    const successCount = runs.filter((item) => normalizeStatus(item.status) === "success").length;
-    const failedCount = runs.filter((item) => normalizeStatus(item.status) === "failed").length;
-    const runningCount = runs.filter((item) => normalizeStatus(item.status) === "running").length;
-    const avgDuration = durations.length
-      ? Math.round(durations.reduce((sum, value) => sum + value, 0) / durations.length)
-      : 0;
-    const p95Duration = Math.round(percentile(durations, 0.95));
-    const successRate = runs.length ? Math.round((successCount / runs.length) * 1000) / 10 : 0;
-    return {
-      totalRuns: pageData?.total ?? runs.length,
-      successCount,
-      failedCount,
-      runningCount,
-      avgDuration,
-      p95Duration,
-      successRate
-    };
-  }, [runs, pageData?.total]);
+  // Filter by query string
+  const filteredRuns = useMemo(() => {
+    const q = queryFilter.trim().toLowerCase();
+    if (!q) return allRuns;
+    return allRuns.filter((r) => r.query.toLowerCase().includes(q) || r.id.toLowerCase().includes(q));
+  }, [allRuns, queryFilter]);
 
-  const current = pageData?.current || pageNo;
-  const pages = pageData?.pages || 1;
-  const total = pageData?.total || 0;
-  const avgDurationMetric = formatDurationMetric(traceStats.avgDuration);
-  const p95DurationMetric = formatDurationMetric(traceStats.p95Duration);
+  // Paginate client-side
+  const total = filteredRuns.length;
+  const pages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+  const currentPage = Math.min(pageNo, pages);
+  const runs = filteredRuns.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
+
+  const stats = useMemo(() => ({
+    total: filteredRuns.length,
+    success: filteredRuns.filter((r) => r.status === "success").length,
+    failed: filteredRuns.filter((r) => r.status === "failed").length,
+    running: filteredRuns.filter((r) => r.status === "running").length,
+    avgDurationMs: filteredRuns.length
+      ? Math.round(filteredRuns.reduce((s, r) => s + r.total_duration_ms, 0) / filteredRuns.length)
+      : 0,
+  }), [filteredRuns]);
+
+  const successRate = stats.total ? Math.round((stats.success / stats.total) * 1000) / 10 : 0;
+  const avgDurationMetric = formatDurationMetric(stats.avgDurationMs);
+
   const statCards: {
     key: string;
     title: string;
@@ -115,14 +101,14 @@ export function RagTracePage() {
     {
       key: "status",
       title: "成功 / 失败 / 运行中",
-      value: `${traceStats.successCount} / ${traceStats.failedCount} / ${traceStats.runningCount}`,
+      value: `${stats.success} / ${stats.failed} / ${stats.running}`,
       icon: <Activity className="h-4 w-4" />,
       tone: "emerald"
     },
     {
       key: "successRate",
       title: "成功率",
-      value: `${traceStats.successRate}%`,
+      value: `${successRate}%`,
       icon: <TrendingUp className="h-4 w-4" />,
       tone: "cyan"
     },
@@ -135,10 +121,9 @@ export function RagTracePage() {
       tone: "indigo"
     },
     {
-      key: "p95",
-      title: "P95 耗时",
-      value: p95DurationMetric.value,
-      unit: p95DurationMetric.unit,
+      key: "total",
+      title: "总运行次数",
+      value: `${stats.total}`,
       icon: <Layers className="h-4 w-4" />,
       tone: "amber"
     }
@@ -156,9 +141,9 @@ export function RagTracePage() {
           </div>
           <div className="admin-page-actions">
             <Input
-              value={traceIdFilter}
-              onChange={(event) => setTraceIdFilter(event.target.value)}
-              placeholder="搜索 Trace Id"
+              value={queryFilter}
+              onChange={(event) => setQueryFilter(event.target.value)}
+              placeholder="搜索 Query / Trace Id"
               className="w-[300px]"
             />
             <Button className="admin-primary-gradient" onClick={handleSearch}>
@@ -188,12 +173,11 @@ export function RagTracePage() {
         <RunsTable
           runs={runs}
           loading={loading}
-          current={current}
+          current={currentPage}
           pages={pages}
           total={total}
-          onOpenRun={(traceId) => navigate(`/admin/traces/${encodeURIComponent(traceId)}`)}
           onPrevPage={() => setPageNo((prev) => Math.max(1, prev - 1))}
-          onNextPage={() => setPageNo((prev) => prev + 1)}
+          onNextPage={() => setPageNo((prev) => Math.min(pages, prev + 1))}
         />
       </div>
     </div>
