@@ -26,7 +26,7 @@ class CreateIntentNodeRequest(BaseModel):
     description: str = ""
 
 
-@router.get("", response_model=list[IntentNodeResponse])
+@router.get("/nodes", response_model=list[IntentNodeResponse])
 async def get_intent_tree(
     repo: IntentRepo = Depends(get_intent_repo),
 ) -> list[IntentNodeResponse]:

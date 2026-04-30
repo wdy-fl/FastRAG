@@ -1,6 +1,7 @@
 from __future__ import annotations
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 from fastrag.api.deps import get_llm_provider, get_embedding_provider, get_redis_cache
 from fastrag.api.routers import chat, conversation, knowledge, ingestion, intent, trace, mapping
 
@@ -19,6 +20,14 @@ app = FastAPI(
     version="0.1.0",
     root_path="/api/fastrag",
     lifespan=lifespan,
+)
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:5173", "http://localhost:5174", "http://127.0.0.1:5173"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
 app.include_router(chat.router, prefix="/chat", tags=["chat"])
