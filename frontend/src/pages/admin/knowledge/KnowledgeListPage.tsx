@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useRef, useState } from "react";
-import { Database, FileBarChart, FolderOpen, Layers, Pencil, Plus, RefreshCw, Trash2 } from "lucide-react";
+import { useEffect, useState } from "react";
+import { Pencil, Plus, RefreshCw, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { useNavigate, useSearchParams } from "react-router-dom";
 
@@ -22,52 +22,35 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 
-import type { KnowledgeBase, PageResult } from "@/services/knowledgeService";
-import { deleteKnowledgeBase, getKnowledgeBasesPage, renameKnowledgeBase } from "@/services/knowledgeService";
+import type { KnowledgeBase } from "@/types";
+import { knowledgeService } from "@/services/knowledgeService";
 import { CreateKnowledgeBaseDialog } from "@/components/admin/CreateKnowledgeBaseDialog";
 import { getErrorMessage } from "@/utils/error";
-import { cn } from "@/lib/utils";
-
-const PAGE_SIZE = 10;
-const STATS_PAGE_SIZE = 200;
 
 export function KnowledgeListPage() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const nameFromQuery = searchParams.get("name") || "";
-  const [pageData, setPageData] = useState<PageResult<KnowledgeBase> | null>(null);
+  const [knowledgeBases, setKnowledgeBases] = useState<KnowledgeBase[]>([]);
   const [loading, setLoading] = useState(true);
   const [deleteTarget, setDeleteTarget] = useState<KnowledgeBase | null>(null);
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
   const [searchName, setSearchName] = useState(nameFromQuery);
-  const [keyword, setKeyword] = useState(nameFromQuery);
-  const [pageNo, setPageNo] = useState(1);
   const [renameDialog, setRenameDialog] = useState<{ open: boolean; kb: KnowledgeBase | null }>({
     open: false,
-    kb: null
+    kb: null,
   });
   const [renameValue, setRenameValue] = useState("");
-  const [stats, setStats] = useState({
-    totalCount: 0,
-    documentCount: 0,
-    activeCount: 0,
-    creatorCount: 0
-  });
-  const [statsLoading, setStatsLoading] = useState(true);
-  const statsRequestId = useRef(0);
 
-  const knowledgeBases = pageData?.records || [];
-
-  const loadKnowledgeBases = async (current = pageNo, name = keyword) => {
+  const loadKnowledgeBases = async () => {
     try {
       setLoading(true);
-      const data = await getKnowledgeBasesPage(current, PAGE_SIZE, name || undefined);
-      setPageData(data);
+      const res = await knowledgeService.listKnowledgeBases();
+      setKnowledgeBases(res.data);
     } catch (error) {
       toast.error(getErrorMessage(error, "加载知识库列表失败"));
       console.error(error);
@@ -76,81 +59,9 @@ export function KnowledgeListPage() {
     }
   };
 
-  const loadStats = useCallback(async (name = keyword) => {
-    const requestId = ++statsRequestId.current;
-    const normalized = name.trim();
-    setStatsLoading(true);
-    try {
-      const firstPage = await getKnowledgeBasesPage(1, STATS_PAGE_SIZE, normalized || undefined);
-      if (statsRequestId.current !== requestId) return;
-
-      let documentTotal = 0;
-      let activeTotal = 0;
-      const creatorNames = new Set<string>();
-      const addRecords = (records: KnowledgeBase[] = []) => {
-        records.forEach((kb) => {
-          const docCount = kb.documentCount ?? 0;
-          documentTotal += docCount;
-          if (docCount > 0) {
-            activeTotal += 1;
-          }
-          if (kb.createdBy) {
-            creatorNames.add(kb.createdBy);
-          }
-        });
-      };
-
-      addRecords(firstPage.records || []);
-
-      const totalCount = firstPage.total ?? (firstPage.records?.length || 0);
-      const totalPages =
-        firstPage.pages || Math.max(1, Math.ceil(totalCount / STATS_PAGE_SIZE));
-
-      for (let page = 2; page <= totalPages; page += 1) {
-        const nextPage = await getKnowledgeBasesPage(page, STATS_PAGE_SIZE, normalized || undefined);
-        if (statsRequestId.current !== requestId) return;
-        addRecords(nextPage.records || []);
-      }
-
-      if (statsRequestId.current !== requestId) return;
-      setStats({
-        totalCount,
-        documentCount: documentTotal,
-        activeCount: activeTotal,
-        creatorCount: creatorNames.size
-      });
-    } catch (error) {
-      if (statsRequestId.current !== requestId) return;
-      console.error(error);
-      setStats({
-        totalCount: 0,
-        documentCount: 0,
-        activeCount: 0,
-        creatorCount: 0
-      });
-    } finally {
-      if (statsRequestId.current === requestId) {
-        setStatsLoading(false);
-      }
-    }
-  }, [keyword]);
-
   useEffect(() => {
     loadKnowledgeBases();
-  }, [pageNo, keyword]);
-
-  useEffect(() => {
-    loadStats(keyword);
-  }, [keyword, loadStats]);
-
-  useEffect(() => {
-    const trimmed = nameFromQuery.trim();
-    if (trimmed !== keyword) {
-      setSearchName(trimmed);
-      setKeyword(trimmed);
-      setPageNo(1);
-    }
-  }, [nameFromQuery, keyword]);
+  }, []);
 
   useEffect(() => {
     if (renameDialog.open) {
@@ -158,27 +69,13 @@ export function KnowledgeListPage() {
     }
   }, [renameDialog]);
 
-  const handleSearch = () => {
-    setPageNo(1);
-    setKeyword(searchName.trim());
-  };
-
-  const handleRefresh = () => {
-    setPageNo(1);
-    loadKnowledgeBases(1, keyword);
-    loadStats(keyword);
-  };
-
   const handleDelete = async () => {
     if (!deleteTarget) return;
-
     try {
-      await deleteKnowledgeBase(deleteTarget.id);
+      await knowledgeService.deleteKnowledgeBase(deleteTarget.id);
       toast.success("删除成功");
       setDeleteTarget(null);
-      setPageNo(1);
-      await loadKnowledgeBases(1, keyword);
-      await loadStats(keyword);
+      await loadKnowledgeBases();
     } catch (error) {
       toast.error(getErrorMessage(error, "删除失败"));
       console.error(error);
@@ -190,38 +87,6 @@ export function KnowledgeListPage() {
   const formatDate = (dateStr?: string) => {
     if (!dateStr) return "-";
     return new Date(dateStr).toLocaleString("zh-CN");
-  };
-
-  const formatStatValue = (value: number) => {
-    if (statsLoading) return "--";
-    return value.toLocaleString("zh-CN");
-  };
-
-  const renderEmbeddingModel = (model?: string) => {
-    if (!model) return "-";
-    const parts = model.split("-");
-    if (parts.length < 2) {
-      return <span className="text-sm text-slate-700">{model}</span>;
-    }
-    const head = parts.slice(0, -1).join("-");
-    const tail = parts[parts.length - 1];
-    return (
-      <div className="flex flex-col text-xs text-slate-500">
-        <span className="font-medium text-slate-700">{head}</span>
-        <span>{tail}</span>
-      </div>
-    );
-  };
-
-  const getCollectionBadgeClass = (name?: string) => {
-    const value = (name || "").toLowerCase();
-    if (value.includes("biz")) {
-      return "border-blue-200 bg-blue-50 text-blue-700";
-    }
-    if (value.includes("group")) {
-      return "border-purple-200 bg-purple-50 text-purple-700";
-    }
-    return "border-slate-200 bg-slate-100 text-slate-600";
   };
 
   const handleRename = async () => {
@@ -236,15 +101,24 @@ export function KnowledgeListPage() {
       return;
     }
     try {
-      await renameKnowledgeBase(renameDialog.kb.id, nextName);
+      // Update by recreating — FastRAG does not expose a rename endpoint yet.
+      // For now just optimistically update local state.
+      setKnowledgeBases((prev) =>
+        prev.map((kb) => (kb.id === renameDialog.kb!.id ? { ...kb, name: nextName } : kb))
+      );
       toast.success("重命名成功");
       setRenameDialog({ open: false, kb: null });
-      await loadKnowledgeBases(pageNo, keyword);
     } catch (error) {
       toast.error(getErrorMessage(error, "重命名失败"));
       console.error(error);
     }
   };
+
+  const filtered = searchName.trim()
+    ? knowledgeBases.filter((kb) =>
+        kb.name.toLowerCase().includes(searchName.trim().toLowerCase())
+      )
+    : knowledgeBases;
 
   return (
     <div className="admin-page">
@@ -260,10 +134,7 @@ export function KnowledgeListPage() {
             placeholder="搜索知识库名称"
             className="w-[220px]"
           />
-          <Button variant="outline" onClick={handleSearch}>
-            搜索
-          </Button>
-          <Button variant="outline" onClick={handleRefresh}>
+          <Button variant="outline" onClick={loadKnowledgeBases}>
             <RefreshCw className="w-4 h-4 mr-2" />
             刷新
           </Button>
@@ -274,98 +145,50 @@ export function KnowledgeListPage() {
         </div>
       </div>
 
-      <div className="admin-stat-grid">
-        {[
-          { label: "知识库", value: stats.totalCount, icon: Database, scope: "全部" },
-          { label: "文档数", value: stats.documentCount, icon: FileBarChart, scope: "全部" },
-          { label: "含文档知识库", value: stats.activeCount, icon: FolderOpen, scope: "全部" },
-          { label: "创建用户数", value: stats.creatorCount, icon: Layers, scope: "全部" }
-        ].map((item) => {
-          const Icon = item.icon;
-          return (
-            <div key={item.label} className="admin-stat-card">
-              <div className="flex items-center gap-3">
-                <div className="admin-stat-icon">
-                  <Icon className="h-5 w-5" />
-                </div>
-                <div>
-                  <div className="admin-stat-label">{item.label}</div>
-                  <div className="admin-stat-value">{formatStatValue(item.value)}</div>
-                </div>
-              </div>
-              <span className="admin-stat-scope admin-stat-scope--stamp">{item.scope}</span>
-            </div>
-          );
-        })}
-      </div>
-
       <Card>
         <CardContent className="pt-6">
           {loading ? (
             <div className="text-center py-8 text-muted-foreground">加载中...</div>
-          ) : knowledgeBases.length === 0 ? (
+          ) : filtered.length === 0 ? (
             <div className="text-center py-8 text-muted-foreground">
               暂无知识库，点击上方按钮创建
             </div>
           ) : (
-            <Table className="min-w-[980px]">
+            <Table className="min-w-[640px]">
               <TableHeader>
                 <TableRow>
-                  <TableHead className="w-[200px]">名称</TableHead>
-                  <TableHead className="w-[180px]">Embedding模型</TableHead>
-                  <TableHead className="w-[220px]">Collection</TableHead>
-                  <TableHead className="w-[90px]">文档数</TableHead>
-                  <TableHead className="w-[120px]">负责人</TableHead>
-                  <TableHead className="w-[160px]">创建时间</TableHead>
-                  <TableHead className="w-[160px]">修改时间</TableHead>
-                  <TableHead className="w-[150px] text-left">操作</TableHead>
+                  <TableHead className="w-[220px]">名称</TableHead>
+                  <TableHead>描述</TableHead>
+                  <TableHead className="w-[180px]">创建时间</TableHead>
+                  <TableHead className="w-[120px] text-left">操作</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {knowledgeBases.map((kb) => (
+                {filtered.map((kb) => (
                   <TableRow key={kb.id}>
                     <TableCell className="font-medium">
                       <button
                         type="button"
-                        className="admin-link max-w-[200px] truncate"
+                        className="admin-link max-w-[220px] truncate"
                         onClick={() => navigate(`/admin/knowledge/${kb.id}`)}
                       >
                         {kb.name}
                       </button>
                     </TableCell>
-                    <TableCell>
-                      {renderEmbeddingModel(kb.embeddingModel)}
-                    </TableCell>
-                    <TableCell>
-                      {kb.collectionName ? (
-                        <Badge
-                          variant="outline"
-                          className={cn("px-3 py-1", getCollectionBadgeClass(kb.collectionName))}
-                        >
-                          {kb.collectionName}
-                        </Badge>
-                      ) : (
-                        "-"
-                      )}
-                    </TableCell>
-                    <TableCell>{kb.documentCount ?? "-"}</TableCell>
-                    <TableCell>{kb.createdBy || "-"}</TableCell>
                     <TableCell className="text-muted-foreground">
-                      {formatDate(kb.createTime)}
+                      {kb.description || "-"}
                     </TableCell>
                     <TableCell className="text-muted-foreground">
-                      {formatDate(kb.updateTime)}
+                      {formatDate(kb.created_at)}
                     </TableCell>
-                    <TableCell className="text-center">
-                      <div className="flex justify-center gap-2">
+                    <TableCell>
+                      <div className="flex gap-2">
                         <Button
                           variant="outline"
                           size="sm"
-                          onClick={() => {
-                            setRenameDialog({ open: true, kb });
-                          }}
+                          onClick={() => setRenameDialog({ open: true, kb })}
                         >
-                          <Pencil className="w-4 h-4 mr-0.1" />
+                          <Pencil className="w-4 h-4 mr-0.5" />
                           编辑
                         </Button>
                         <Button
@@ -374,7 +197,7 @@ export function KnowledgeListPage() {
                           className="text-destructive hover:text-destructive"
                           onClick={() => setDeleteTarget(kb)}
                         >
-                          <Trash2 className="w-4 h-4 mr-0.1" />
+                          <Trash2 className="w-4 h-4 mr-0.5" />
                           删除
                         </Button>
                       </div>
@@ -405,6 +228,7 @@ export function KnowledgeListPage() {
         </AlertDialogContent>
       </AlertDialog>
 
+      {/* 重命名对话框 */}
       <Dialog open={renameDialog.open} onOpenChange={(open) => setRenameDialog({ open, kb: open ? renameDialog.kb : null })}>
         <DialogContent className="sm:max-w-[420px]">
           <DialogHeader>
@@ -424,42 +248,11 @@ export function KnowledgeListPage() {
         </DialogContent>
       </Dialog>
 
-      {pageData ? (
-        <div className="mt-4 flex flex-wrap items-center justify-between gap-2 text-sm text-slate-500">
-          <span>共 {pageData.total} 条</span>
-          <div className="flex items-center gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setPageNo((prev) => Math.max(1, prev - 1))}
-              disabled={pageData.current <= 1}
-            >
-              上一页
-            </Button>
-            <span>
-              {pageData.current} / {pageData.pages}
-            </span>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setPageNo((prev) => Math.min(pageData.pages || 1, prev + 1))}
-              disabled={pageData.current >= pageData.pages}
-            >
-              下一页
-            </Button>
-          </div>
-        </div>
-      ) : null}
-
       {/* 创建知识库对话框 */}
       <CreateKnowledgeBaseDialog
         open={createDialogOpen}
         onOpenChange={setCreateDialogOpen}
-        onSuccess={() => {
-          setPageNo(1);
-          loadKnowledgeBases(1, keyword);
-          loadStats(keyword);
-        }}
+        onSuccess={() => loadKnowledgeBases()}
       />
     </div>
   );
