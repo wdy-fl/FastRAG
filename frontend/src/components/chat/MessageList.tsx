@@ -4,10 +4,10 @@ import { Virtuoso, type VirtuosoHandle } from "react-virtuoso";
 import { MessageItem } from "@/components/chat/MessageItem";
 import { WelcomeScreen } from "@/components/chat/WelcomeScreen";
 import { cn } from "@/lib/utils";
-import type { Message } from "@/types";
+import type { ClientMessage } from "@/types";
 
 interface MessageListProps {
-  messages: Message[];
+  messages: ClientMessage[];
   isLoading: boolean;
   isStreaming: boolean;
   sessionKey?: string | null;

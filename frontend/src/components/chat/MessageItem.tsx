@@ -5,10 +5,10 @@ import { FeedbackButtons } from "@/components/chat/FeedbackButtons";
 import { MarkdownRenderer } from "@/components/chat/MarkdownRenderer";
 import { ThinkingIndicator } from "@/components/chat/ThinkingIndicator";
 import { cn } from "@/lib/utils";
-import type { Message } from "@/types";
+import type { ClientMessage } from "@/types";
 
 interface MessageItemProps {
-  message: Message;
+  message: ClientMessage;
   isLast?: boolean;
 }
 
@@ -35,12 +35,14 @@ export const MessageItem = React.memo(function MessageItem({ message, isLast }: 
     );
   }
 
-  const thinkingDuration = message.thinkingDuration ? `${message.thinkingDuration}秒` : "";
+  const thinkingDuration = message.thinkingDurationMs
+    ? `${Math.round(message.thinkingDurationMs)}秒`
+    : "";
   return (
     <div className="group flex">
       <div className="min-w-0 flex-1 space-y-4">
         {isThinking ? (
-          <ThinkingIndicator content={message.thinking} duration={message.thinkingDuration} />
+          <ThinkingIndicator content={message.thinking} duration={message.thinkingDurationMs} />
         ) : null}
         {!isThinking && hasThinking ? (
           <div className="overflow-hidden rounded-lg border border-[#BFDBFE] bg-[#DBEAFE]">

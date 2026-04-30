@@ -63,9 +63,12 @@ export interface Mapping {
 }
 
 // 客户端专用（不对应后端模型）
+export type FeedbackValue = "like" | "dislike" | null;
+
 export interface ClientMessage extends Message {
   isDeepThinking?: boolean;
   isThinking?: boolean;
   thinkingDurationMs?: number;
   guidance?: unknown;
+  feedback?: FeedbackValue;
 }
