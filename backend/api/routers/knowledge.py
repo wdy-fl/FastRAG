@@ -1,4 +1,5 @@
 from __future__ import annotations
+from datetime import datetime
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel
 from backend.api.deps import get_knowledge_repo
@@ -17,6 +18,7 @@ class KnowledgeBaseResponse(BaseModel):
     id: str
     name: str
     description: str
+    created_at: datetime
 
 
 @router.post("", status_code=status.HTTP_201_CREATED, response_model=KnowledgeBaseResponse)
@@ -29,7 +31,7 @@ async def create_knowledge_base(
         description=body.description,
         ingestion_config=body.ingestion_config,
     )
-    return KnowledgeBaseResponse(id=kb.id, name=kb.name, description=kb.description)
+    return KnowledgeBaseResponse(id=kb.id, name=kb.name, description=kb.description, created_at=kb.created_at)
 
 
 @router.get("", response_model=list[KnowledgeBaseResponse])
@@ -37,7 +39,7 @@ async def list_knowledge_bases(
     repo: KnowledgeRepo = Depends(get_knowledge_repo),
 ) -> list[KnowledgeBaseResponse]:
     kbs = await repo.list_knowledge_bases()
-    return [KnowledgeBaseResponse(id=kb.id, name=kb.name, description=kb.description) for kb in kbs]
+    return [KnowledgeBaseResponse(id=kb.id, name=kb.name, description=kb.description, created_at=kb.created_at) for kb in kbs]
 
 
 @router.get("/{kb_id}", response_model=KnowledgeBaseResponse)
@@ -48,7 +50,7 @@ async def get_knowledge_base(
     kb = await repo.get_knowledge_base(kb_id)
     if not kb:
         raise HTTPException(status_code=404, detail="Knowledge base not found")
-    return KnowledgeBaseResponse(id=kb.id, name=kb.name, description=kb.description)
+    return KnowledgeBaseResponse(id=kb.id, name=kb.name, description=kb.description, created_at=kb.created_at)
 
 
 @router.delete("/{kb_id}", status_code=status.HTTP_204_NO_CONTENT)
