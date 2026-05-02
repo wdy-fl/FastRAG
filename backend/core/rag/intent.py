@@ -25,13 +25,17 @@ class LLMIntentClassifier:
         self._nodes_by_id: dict[str, IntentNode] = {n.id: n for n in intent_nodes}
 
     async def classify(self, query: str) -> IntentResult:
+        # 没有配置意图节点时，跳过分类直接放行
+        if not self._nodes:
+            return IntentResult(needs_guidance=False, confidence=1.0)
+
         nodes_text = "\n".join(
             f"- id={n.id} name={n.name} level={n.level} keywords={n.keywords}"
             for n in self._nodes
         )
         prompt = _CLASSIFY_PROMPT.format(nodes=nodes_text or "none", query=query)
         parts: list[str] = []
-        async for event in await self._llm.stream(
+        async for event in self._llm.stream(
             [{"role": "user", "content": prompt}]
         ):
             if event.type == "content":

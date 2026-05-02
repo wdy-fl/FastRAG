@@ -26,7 +26,7 @@ class LLMQueryRewriter:
         )
         prompt = _REWRITE_PROMPT.format(history=history_text or "none", query=query)
         parts: list[str] = []
-        async for event in await self._llm.stream(
+        async for event in self._llm.stream(
             [{"role": "user", "content": prompt}]
         ):
             if event.type == "content":
@@ -36,7 +36,7 @@ class LLMQueryRewriter:
     async def split(self, query: str) -> list[str]:
         prompt = _SPLIT_PROMPT.format(query=query)
         parts: list[str] = []
-        async for event in await self._llm.stream(
+        async for event in self._llm.stream(
             [{"role": "user", "content": prompt}]
         ):
             if event.type == "content":

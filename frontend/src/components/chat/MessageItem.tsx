@@ -1,11 +1,17 @@
 import * as React from "react";
-import { Brain, ChevronDown } from "lucide-react";
+import { Brain, ChevronDown, HelpCircle } from "lucide-react";
 
 import { FeedbackButtons } from "@/components/chat/FeedbackButtons";
 import { MarkdownRenderer } from "@/components/chat/MarkdownRenderer";
 import { ThinkingIndicator } from "@/components/chat/ThinkingIndicator";
 import { cn } from "@/lib/utils";
 import type { ClientMessage } from "@/types";
+
+interface GuidanceIntent {
+  needs_guidance?: boolean;
+  guidance_message?: string;
+  candidates?: Array<{ id: string; name: string; description?: string }>;
+}
 
 interface MessageItemProps {
   message: ClientMessage;
@@ -24,6 +30,8 @@ export const MessageItem = React.memo(function MessageItem({ message, isLast }: 
   const hasThinking = Boolean(message.thinking && message.thinking.trim().length > 0);
   const hasContent = message.content.trim().length > 0;
   const isWaiting = message.status === "streaming" && !isThinking && !hasContent;
+  const guidance = message.guidance as GuidanceIntent | undefined;
+  const hasGuidance = Boolean(guidance?.needs_guidance);
 
   if (isUser) {
     return (
@@ -86,6 +94,27 @@ export const MessageItem = React.memo(function MessageItem({ message, isLast }: 
                 <span className="ai-wait-dot" />
                 <span className="ai-wait-dot" />
               </span>
+            </div>
+          ) : null}
+          {hasGuidance ? (
+            <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3">
+              <div className="flex items-start gap-2">
+                <HelpCircle className="mt-0.5 h-4 w-4 shrink-0 text-amber-500" />
+                <div className="space-y-2">
+                  <p className="text-sm text-amber-800">
+                    {guidance?.guidance_message || "请进一步明确您的问题。"}
+                  </p>
+                  {guidance?.candidates && guidance.candidates.length > 0 ? (
+                    <ul className="space-y-1">
+                      {guidance.candidates.map((c) => (
+                        <li key={c.id} className="text-sm text-amber-700">
+                          · {c.name}{c.description ? `：${c.description}` : ""}
+                        </li>
+                      ))}
+                    </ul>
+                  ) : null}
+                </div>
+              </div>
             </div>
           ) : null}
           {hasContent ? <MarkdownRenderer content={message.content} /> : null}

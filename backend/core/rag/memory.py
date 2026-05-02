@@ -54,7 +54,7 @@ class SlidingWindowMemory:
             f"Recent messages:\n{history_text}"
         )
         parts: list[str] = []
-        async for event in await self._llm.stream(
+        async for event in self._llm.stream(
             [{"role": "user", "content": prompt}]
         ):
             if event.type == "content":
