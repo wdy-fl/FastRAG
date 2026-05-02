@@ -16,6 +16,13 @@ class ConversationResponse(BaseModel):
     title: str
 
 
+class MessageResponse(BaseModel):
+    id: str
+    role: str
+    content: str
+    seq: int
+
+
 @router.post("", status_code=status.HTTP_201_CREATED, response_model=ConversationResponse)
 async def create_conversation(
     body: CreateConversationRequest,
@@ -31,6 +38,21 @@ async def list_conversations(
 ) -> list[ConversationResponse]:
     convs = await repo.list_conversations()
     return [ConversationResponse(id=c.id, title=c.title) for c in convs]
+
+
+@router.get("/{conversation_id}/messages", response_model=list[MessageResponse])
+async def list_messages(
+    conversation_id: str,
+    repo: ConversationRepo = Depends(get_conversation_repo),
+) -> list[MessageResponse]:
+    conv = await repo.get_conversation(conversation_id)
+    if not conv:
+        raise HTTPException(status_code=404, detail="Conversation not found")
+    messages = await repo.get_all_messages(conversation_id)
+    return [
+        MessageResponse(id=m.id, role=m.role, content=m.content, seq=m.seq)
+        for m in messages
+    ]
 
 
 @router.get("/{conversation_id}", response_model=ConversationResponse)

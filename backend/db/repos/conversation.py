@@ -11,6 +11,15 @@ class ConversationRepo:
     def __init__(self, session: AsyncSession) -> None:
         self._session = session
 
+    async def get_all_messages(self, conversation_id: str) -> list[MessageORM]:
+        stmt = (
+            select(MessageORM)
+            .where(MessageORM.conversation_id == conversation_id)
+            .order_by(MessageORM.seq.asc())
+        )
+        result = await self._session.execute(stmt)
+        return list(result.scalars().all())
+
     async def get_recent_messages(
         self, conversation_id: str, limit: int
     ) -> list[MessageORM]:
