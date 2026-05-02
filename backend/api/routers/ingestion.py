@@ -19,7 +19,7 @@ class TriggerIngestionRequest(BaseModel):
     filename: str
     source_type: str
     source_uri: str
-    parser_type: str = "unstructured"
+    parser_type: str = "markdown"
     chunker_type: str = "structure_aware"
     chunk_size: int = 500
     overlap: int = 50
