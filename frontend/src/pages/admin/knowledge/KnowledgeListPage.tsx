@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Pencil, Plus, RefreshCw, Trash2 } from "lucide-react";
+import { FolderOpen, Plus, RefreshCw, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { useNavigate, useSearchParams } from "react-router-dom";
 
@@ -23,7 +23,6 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Card, CardContent } from "@/components/ui/card";
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 
 import type { KnowledgeBase } from "@/types";
@@ -40,11 +39,6 @@ export function KnowledgeListPage() {
   const [deleteTarget, setDeleteTarget] = useState<KnowledgeBase | null>(null);
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
   const [searchName, setSearchName] = useState(nameFromQuery);
-  const [renameDialog, setRenameDialog] = useState<{ open: boolean; kb: KnowledgeBase | null }>({
-    open: false,
-    kb: null,
-  });
-  const [renameValue, setRenameValue] = useState("");
 
   const loadKnowledgeBases = async () => {
     try {
@@ -62,12 +56,6 @@ export function KnowledgeListPage() {
   useEffect(() => {
     loadKnowledgeBases();
   }, []);
-
-  useEffect(() => {
-    if (renameDialog.open) {
-      setRenameValue(renameDialog.kb?.name || "");
-    }
-  }, [renameDialog]);
 
   const handleDelete = async () => {
     if (!deleteTarget) return;
@@ -87,31 +75,6 @@ export function KnowledgeListPage() {
   const formatDate = (dateStr?: string) => {
     if (!dateStr) return "-";
     return new Date(dateStr).toLocaleString("zh-CN");
-  };
-
-  const handleRename = async () => {
-    if (!renameDialog.kb) return;
-    const nextName = renameValue.trim();
-    if (!nextName) {
-      toast.error("请输入知识库名称");
-      return;
-    }
-    if (nextName === renameDialog.kb.name) {
-      setRenameDialog({ open: false, kb: null });
-      return;
-    }
-    try {
-      // Update by recreating — FastRAG does not expose a rename endpoint yet.
-      // For now just optimistically update local state.
-      setKnowledgeBases((prev) =>
-        prev.map((kb) => (kb.id === renameDialog.kb!.id ? { ...kb, name: nextName } : kb))
-      );
-      toast.success("重命名成功");
-      setRenameDialog({ open: false, kb: null });
-    } catch (error) {
-      toast.error(getErrorMessage(error, "重命名失败"));
-      console.error(error);
-    }
   };
 
   const filtered = searchName.trim()
@@ -167,13 +130,7 @@ export function KnowledgeListPage() {
                 {filtered.map((kb) => (
                   <TableRow key={kb.id}>
                     <TableCell className="font-medium">
-                      <button
-                        type="button"
-                        className="admin-link max-w-[220px] truncate"
-                        onClick={() => navigate(`/admin/knowledge/${kb.id}`)}
-                      >
-                        {kb.name}
-                      </button>
+                      <span className="max-w-[220px] truncate block">{kb.name}</span>
                     </TableCell>
                     <TableCell className="text-muted-foreground">
                       {kb.description || "-"}
@@ -186,10 +143,10 @@ export function KnowledgeListPage() {
                         <Button
                           variant="outline"
                           size="sm"
-                          onClick={() => setRenameDialog({ open: true, kb })}
+                          onClick={() => navigate(`/admin/knowledge/${kb.id}`)}
                         >
-                          <Pencil className="w-4 h-4 mr-0.5" />
-                          编辑
+                          <FolderOpen className="w-4 h-4 mr-0.5" />
+                          文档管理
                         </Button>
                         <Button
                           variant="ghost"
@@ -227,26 +184,6 @@ export function KnowledgeListPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-
-      {/* 重命名对话框 */}
-      <Dialog open={renameDialog.open} onOpenChange={(open) => setRenameDialog({ open, kb: open ? renameDialog.kb : null })}>
-        <DialogContent className="sm:max-w-[420px]">
-          <DialogHeader>
-            <DialogTitle>重命名知识库</DialogTitle>
-            <DialogDescription>修改知识库名称</DialogDescription>
-          </DialogHeader>
-          <div className="space-y-2">
-            <label className="text-sm font-medium">名称</label>
-            <Input value={renameValue} onChange={(event) => setRenameValue(event.target.value)} />
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setRenameDialog({ open: false, kb: null })}>
-              取消
-            </Button>
-            <Button onClick={handleRename}>保存</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
 
       {/* 创建知识库对话框 */}
       <CreateKnowledgeBaseDialog
