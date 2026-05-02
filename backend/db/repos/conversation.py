@@ -92,6 +92,31 @@ class ConversationRepo:
 
     async def delete_conversation(self, conversation_id: str) -> None:
         from sqlalchemy import delete
+        from backend.db.models.trace import RagTraceNodeORM, RagTraceRunORM
+        # 先删 trace nodes（引用 trace runs）
+        run_ids_stmt = select(RagTraceRunORM.id).where(
+            RagTraceRunORM.conversation_id == conversation_id
+        )
+        run_ids_result = await self._session.execute(run_ids_stmt)
+        run_ids = run_ids_result.scalars().all()
+        if run_ids:
+            await self._session.execute(
+                delete(RagTraceNodeORM).where(RagTraceNodeORM.run_id.in_(run_ids))
+            )
+        # 再删 trace runs
+        await self._session.execute(
+            delete(RagTraceRunORM).where(RagTraceRunORM.conversation_id == conversation_id)
+        )
+        # 删 summary 和 messages
+        await self._session.execute(
+            delete(ConversationSummaryORM).where(
+                ConversationSummaryORM.conversation_id == conversation_id
+            )
+        )
+        await self._session.execute(
+            delete(MessageORM).where(MessageORM.conversation_id == conversation_id)
+        )
+        # 最后删 conversation
         await self._session.execute(
             delete(ConversationORM).where(ConversationORM.id == conversation_id)
         )
