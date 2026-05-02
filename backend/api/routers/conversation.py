@@ -16,6 +16,10 @@ class ConversationResponse(BaseModel):
     title: str
 
 
+class UpdateConversationRequest(BaseModel):
+    title: str
+
+
 class MessageResponse(BaseModel):
     id: str
     role: str
@@ -64,6 +68,19 @@ async def get_conversation(
     if not conv:
         raise HTTPException(status_code=404, detail="Conversation not found")
     return ConversationResponse(id=conv.id, title=conv.title)
+
+
+@router.put("/{conversation_id}", response_model=ConversationResponse)
+async def update_conversation(
+    conversation_id: str,
+    body: UpdateConversationRequest,
+    repo: ConversationRepo = Depends(get_conversation_repo),
+) -> ConversationResponse:
+    conv = await repo.get_conversation(conversation_id)
+    if not conv:
+        raise HTTPException(status_code=404, detail="Conversation not found")
+    await repo.update_title(conversation_id, body.title)
+    return ConversationResponse(id=conversation_id, title=body.title)
 
 
 @router.delete("/{conversation_id}", status_code=status.HTTP_204_NO_CONTENT)

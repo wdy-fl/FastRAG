@@ -82,6 +82,12 @@ class ConversationRepo:
         result = await self._session.execute(stmt)
         return result.scalar_one()
 
+    async def update_title(self, conversation_id: str, title: str) -> None:
+        conv = await self.get_conversation(conversation_id)
+        if conv:
+            conv.title = title
+            await self._session.commit()
+
     async def create_conversation(self, title: str) -> ConversationORM:
         conv = ConversationORM(id=str(uuid4()), title=title)
         self._session.add(conv)
