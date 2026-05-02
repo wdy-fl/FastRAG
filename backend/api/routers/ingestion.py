@@ -85,7 +85,7 @@ async def trigger_ingestion(
             )
 
     asyncio.create_task(_run())
-    return TriggerIngestionResponse(document_id=doc.id, status="processing")
+    return TriggerIngestionResponse(document_id=doc.id, status=doc.status)
 
 
 @router.get("/knowledge-bases/{kb_id}/documents")

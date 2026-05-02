@@ -16,9 +16,9 @@ import type { KnowledgeBase, Document } from "@/types";
 import { knowledgeService } from "@/services/knowledgeService";
 
 const statusColors: Record<string, string> = {
-  processing: "bg-blue-100 text-blue-800",
-  done: "bg-green-100 text-green-800",
-  failed: "bg-red-100 text-red-800",
+  pending:   "bg-blue-100 text-blue-800",
+  completed: "bg-green-100 text-green-800",
+  failed:    "bg-red-100 text-red-800",
 };
 
 const formatDate = (value?: string | null) => {
@@ -80,7 +80,7 @@ export function KnowledgeDocumentsPage() {
 
   // Poll every 3s when any document is still processing
   useEffect(() => {
-    const hasProcessing = documents.some((d) => d.status === "processing");
+    const hasProcessing = documents.some((d) => d.status === "pending");
     if (!hasProcessing) return;
     const timer = setInterval(fetchDocuments, 3000);
     return () => clearInterval(timer);
