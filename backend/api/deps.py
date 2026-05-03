@@ -14,7 +14,9 @@ from backend.db.repos.ingestion_task import IngestionTaskRepo
 from backend.core.rag.memory import SlidingWindowMemory
 from backend.core.rag.rewrite import LLMQueryRewriter
 from backend.core.rag.intent import LLMIntentClassifier
-from backend.core.rag.retrieve import MultiChannelRetriever, VectorSearchChannel, DeduplicationProcessor
+from backend.core.rag.retrieve import MultiChannelRetriever, VectorSearchChannel, QuestionSearchChannel
+from backend.infra.search.keyword import KeywordSearchChannel
+from backend.infra.rerank.bailian import BailianRerankClient
 from backend.core.rag.prompt import PromptBuilder
 from backend.core.rag.pipeline import RAGPipeline
 from backend.core.rag.tracer import RagTracer
@@ -77,6 +79,14 @@ def get_redis_cache() -> RedisCache:
     return RedisCache(url=get_settings().redis_url)
 
 
+@lru_cache
+def get_reranker() -> BailianRerankClient | None:
+    s = get_settings()
+    if s.rerank.api_key:
+        return BailianRerankClient(api_key=s.rerank.api_key, model=s.rerank.model)
+    return None
+
+
 async def get_db_session() -> AsyncSession:
     factory = get_session_factory()
     async with factory() as session:
@@ -122,11 +132,15 @@ def get_rag_pipeline(
             confidence_threshold=s.rag_intent_confidence_threshold,
         ),
         retriever=MultiChannelRetriever(
-            channels=[VectorSearchChannel(vector_store=get_vector_store(), llm=get_embedding_provider())],
-            post_processors=[DeduplicationProcessor()],
+            channels=[
+                VectorSearchChannel(vector_store=get_vector_store(), llm=get_embedding_provider()),
+                QuestionSearchChannel(vector_store=get_vector_store(), llm=get_embedding_provider()),
+                KeywordSearchChannel(session_factory=get_session_factory()),
+            ],
         ),
         prompt_builder=PromptBuilder(),
         tracer=RagTracer(repo=trace_repo),
+        reranker=get_reranker(),
     )
 
 
@@ -156,7 +170,11 @@ def get_ingestion_engine() -> IngestionEngine:
                 }
             ),
             "enricher": EnricherNode(llm=llm),
-            "indexer": IndexerNode(llm=get_embedding_provider(), vector_store=get_vector_store()),
+            "indexer": IndexerNode(
+                llm=get_embedding_provider(),
+                vector_store=get_vector_store(),
+                session_factory=get_session_factory(),
+            ),
         }
     )
 

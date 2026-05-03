@@ -10,6 +10,7 @@ from backend.core.rag.retrieve import MultiChannelRetriever
 from backend.core.rag.prompt import PromptBuilder
 from backend.core.rag.tracer import RagTracer
 from backend.core.rag.protocols import LLMProvider
+from backend.infra.rerank.bailian import BailianRerankClient
 
 
 class RAGPipeline:
@@ -22,6 +23,7 @@ class RAGPipeline:
         retriever: MultiChannelRetriever,
         prompt_builder: PromptBuilder,
         tracer: RagTracer,
+        reranker: BailianRerankClient | None = None,
     ) -> None:
         self._llm = llm
         self._memory = memory
@@ -30,6 +32,7 @@ class RAGPipeline:
         self._retriever = retriever
         self._prompt_builder = prompt_builder
         self._tracer = tracer
+        self._reranker = reranker
 
     async def chat(self, request: ChatRequest) -> AsyncIterator[ChatEvent]:
         start = time.monotonic()
@@ -62,6 +65,9 @@ class RAGPipeline:
             retrieved = await self._tracer.trace_node("retrieval")(
                 self._retriever.retrieve
             )(sub_queries, intents)
+
+            if self._reranker is not None:
+                retrieved = await self._reranker.rerank(request.query, retrieved)
 
             prompt = self._prompt_builder.build(
                 request.query, history, retrieved, list(intents)

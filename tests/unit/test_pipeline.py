@@ -3,24 +3,40 @@ import asyncio
 from unittest.mock import AsyncMock, MagicMock
 from backend.core.rag.pipeline import RAGPipeline
 from backend.core.models.chat import (
-    ChatRequest, ConversationHistory, LLMEvent, GuidanceEvent,
+    ChatRequest, ConversationHistory, LLMEvent, GuidanceEvent, RetrievedChunk,
 )
 from backend.core.models.intent import IntentResult
+from backend.infra.rerank.bailian import BailianRerankClient
 
 
-def _make_pipeline(needs_guidance=False, llm_content="Hello!", llm_stream_fn=None):
-    mock_llm = AsyncMock()
+def _make_stream(content: str):
+    async def _gen():
+        yield LLMEvent(type="content", content=content)
+        yield LLMEvent(type="done", content="")
+    return _gen()
 
-    if llm_stream_fn is not None:
-        mock_llm.stream = llm_stream_fn
+
+def _make_pipeline(
+    needs_guidance=False,
+    llm_content="Hello!",
+    llm_stream_fn=None,
+    llm=None,
+    retriever=None,
+    reranker=None,
+):
+    if llm is not None:
+        mock_llm = llm
     else:
-        def fake_stream(messages, **kwargs):
-            async def _gen():
-                yield LLMEvent(type="content", content=llm_content)
-                yield LLMEvent(type="done", content="")
-            return _gen()
-
-        mock_llm.stream = fake_stream
+        mock_llm = AsyncMock()
+        if llm_stream_fn is not None:
+            mock_llm.stream = llm_stream_fn
+        else:
+            def fake_stream(messages, **kwargs):
+                async def _gen():
+                    yield LLMEvent(type="content", content=llm_content)
+                    yield LLMEvent(type="done", content="")
+                return _gen()
+            mock_llm.stream = fake_stream
 
     mock_memory = AsyncMock()
     mock_memory.load = AsyncMock(return_value=ConversationHistory())
@@ -35,8 +51,11 @@ def _make_pipeline(needs_guidance=False, llm_content="Hello!", llm_stream_fn=Non
         return_value=IntentResult(needs_guidance=needs_guidance)
     )
 
-    mock_retriever = AsyncMock()
-    mock_retriever.retrieve = AsyncMock(return_value=[])
+    if retriever is not None:
+        mock_retriever = retriever
+    else:
+        mock_retriever = AsyncMock()
+        mock_retriever.retrieve = AsyncMock(return_value=[])
 
     mock_prompt = MagicMock()
     mock_prompt.build = MagicMock(
@@ -62,6 +81,7 @@ def _make_pipeline(needs_guidance=False, llm_content="Hello!", llm_stream_fn=Non
         retriever=mock_retriever,
         prompt_builder=mock_prompt,
         tracer=mock_tracer,
+        reranker=reranker,
     )
 
 
@@ -114,3 +134,52 @@ async def test_chat_passes_deep_thinking_to_llm():
     events = [e async for e in pipeline.chat(req)]
     assert any(e.type in ("content", "done") for e in events)
     assert captured_kwargs.get("extra_body") == {"enable_thinking": True}
+
+
+@pytest.mark.asyncio
+async def test_pipeline_calls_reranker_when_provided():
+    """当 reranker 存在时，pipeline 应在 retrieval 之后调用 reranker.rerank()。"""
+    mock_llm = MagicMock()
+    mock_llm.stream = MagicMock(side_effect=lambda msgs, **kw: _make_stream("answer"))
+
+    mock_retriever = AsyncMock()
+    mock_retriever.retrieve = AsyncMock(
+        return_value=[RetrievedChunk(content="chunk", score=0.9)]
+    )
+
+    mock_reranker = AsyncMock(spec=BailianRerankClient)
+    mock_reranker.rerank = AsyncMock(
+        return_value=[RetrievedChunk(content="reranked chunk", score=0.95)]
+    )
+
+    pipeline = _make_pipeline(
+        llm=mock_llm,
+        retriever=mock_retriever,
+        reranker=mock_reranker,
+    )
+    events = []
+    async for event in pipeline.chat(ChatRequest(query="test", conversation_id="c1")):
+        events.append(event)
+
+    mock_reranker.rerank.assert_awaited_once()
+    call_args = mock_reranker.rerank.call_args
+    assert call_args[0][0] == "test"  # query 参数
+
+
+@pytest.mark.asyncio
+async def test_pipeline_skips_reranker_when_none():
+    mock_llm = MagicMock()
+    mock_llm.stream = MagicMock(side_effect=lambda msgs, **kw: _make_stream("answer"))
+
+    mock_retriever = AsyncMock()
+    mock_retriever.retrieve = AsyncMock(
+        return_value=[RetrievedChunk(content="chunk", score=0.9)]
+    )
+
+    pipeline = _make_pipeline(llm=mock_llm, retriever=mock_retriever, reranker=None)
+    events = []
+    async for event in pipeline.chat(ChatRequest(query="test", conversation_id="c1")):
+        events.append(event)
+
+    # 验证 pipeline 正常完成，不抛异常
+    assert any(e.type == "done" for e in events if hasattr(e, "type"))
