@@ -2,7 +2,10 @@ import pytest
 from unittest.mock import AsyncMock, MagicMock
 from backend.core.rag.rewrite import LLMQueryRewriter
 from backend.core.rag.intent import LLMIntentClassifier
-from backend.core.rag.retrieve import MultiChannelRetriever, VectorSearchChannel, DeduplicationProcessor
+from backend.core.rag.retrieve import (
+    MultiChannelRetriever, VectorSearchChannel,
+    QuestionSearchChannel, KeywordSearchChannel, RrfProcessor,
+)
 from backend.core.rag.prompt import PromptBuilder
 from backend.core.models.chat import ConversationHistory, LLMEvent, RetrievedChunk
 from backend.core.models.intent import IntentNode, IntentResult
@@ -78,19 +81,6 @@ async def test_vector_channel_searches_store():
     assert results[0].content == "result"
 
 
-@pytest.mark.asyncio
-async def test_deduplication_removes_duplicate_content():
-    processor = DeduplicationProcessor()
-    chunks = [
-        RetrievedChunk(content="same text", score=0.9),
-        RetrievedChunk(content="same text", score=0.8),
-        RetrievedChunk(content="different text", score=0.7),
-    ]
-    result = await processor.process(chunks)
-    assert len(result) == 2
-    assert result[0].content == "same text"
-    assert result[0].score == 0.9  # keeps higher score
-
 
 def test_prompt_builder_includes_query_and_chunks():
     builder = PromptBuilder(system_prompt="You are a helpful assistant.")
@@ -105,3 +95,72 @@ def test_prompt_builder_includes_query_and_chunks():
     combined = " ".join(str(m) for m in messages)
     assert "What is X?" in combined
     assert "Context chunk" in combined
+
+
+@pytest.mark.asyncio
+async def test_question_channel_calls_search_questions():
+    mock_store = AsyncMock()
+    mock_llm = AsyncMock()
+    mock_store.search_questions = AsyncMock(
+        return_value=[RetrievedChunk(content="question result", score=0.85, document_id="d1")]
+    )
+    mock_llm.embed = AsyncMock(return_value=[[0.1] * 10])
+
+    channel = QuestionSearchChannel(vector_store=mock_store, llm=mock_llm)
+    results = await channel.search("退款多久？", IntentResult(), top_k=5)
+
+    mock_store.search_questions.assert_awaited_once()
+    assert len(results) == 1
+    assert results[0].content == "question result"
+
+
+@pytest.mark.asyncio
+async def test_keyword_channel_searches_by_tsquery():
+    mock_session = AsyncMock()
+    mock_session_factory = MagicMock()
+    mock_session_factory.return_value.__aenter__ = AsyncMock(return_value=mock_session)
+    mock_session_factory.return_value.__aexit__ = AsyncMock(return_value=False)
+
+    mock_result = MagicMock()
+    mock_result.all.return_value = []
+    mock_session.execute = AsyncMock(return_value=mock_result)
+
+    channel = KeywordSearchChannel(session_factory=mock_session_factory)
+    results = await channel.search("退款政策", IntentResult(), top_k=5)
+
+    mock_session.execute.assert_awaited_once()
+    assert isinstance(results, list)
+
+
+@pytest.mark.asyncio
+async def test_rrf_processor_merges_and_deduplicates():
+    processor = RrfProcessor()
+    channel_results = [
+        [
+            RetrievedChunk(content="chunk A", score=0.9, document_id="d1"),
+            RetrievedChunk(content="chunk B", score=0.8, document_id="d2"),
+        ],
+        [
+            RetrievedChunk(content="chunk A", score=0.7, document_id="d1"),
+            RetrievedChunk(content="chunk C", score=0.6, document_id="d3"),
+        ],
+    ]
+    result = await processor.process(channel_results)
+
+    contents = [c.content for c in result]
+    assert contents.count("chunk A") == 1
+    assert len(result) == 3
+    assert result[0].content == "chunk A"
+
+
+@pytest.mark.asyncio
+async def test_multi_channel_retriever_uses_rrf():
+    mock_channel = AsyncMock()
+    mock_channel.search = AsyncMock(
+        return_value=[RetrievedChunk(content="result", score=0.9, document_id="d1")]
+    )
+    retriever = MultiChannelRetriever(channels=[mock_channel])
+    results = await retriever.retrieve(["query"], [IntentResult()])
+
+    assert len(results) == 1
+    assert results[0].content == "result"
