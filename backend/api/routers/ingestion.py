@@ -36,7 +36,7 @@ _NODE_TO_DOC_STATUS: dict[str, str] = {
 
 # 系统默认摄入配置（KB 未配置时使用）
 _DEFAULT_INGESTION_CONFIG: dict = {
-    "parser": {"parser_type": "unstructured"},
+    "parser": {"parser_type": "markdown"},
     "chunker": {"chunker_type": "structure_aware", "chunk_size": 500, "overlap": 50},
     "indexer": {"batch_size": 100},
 }

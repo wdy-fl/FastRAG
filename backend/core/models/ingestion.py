@@ -11,7 +11,7 @@ class FetcherSettings(BaseModel):
 
 
 class ParserSettings(BaseModel):
-    parser_type: Literal["unstructured", "markdown"] = "unstructured"
+    parser_type: Literal["unstructured", "markdown"] = "markdown"
 
 
 class ChunkerSettings(BaseModel):

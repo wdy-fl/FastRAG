@@ -20,7 +20,7 @@ interface Props {
 export function KbIngestionConfigDialog({ kb, open, onOpenChange, onSaved }: Props) {
   const cfg = kb.ingestion_config ?? {};
 
-  const [parserType, setParserType] = useState(cfg.parser?.parser_type ?? "unstructured");
+  const [parserType, setParserType] = useState(cfg.parser?.parser_type ?? "markdown");
   const [chunkerType, setChunkerType] = useState(cfg.chunker?.chunker_type ?? "structure_aware");
   const [minChars, setMinChars] = useState(cfg.chunker?.min_chars ?? 600);
   const [targetChars, setTargetChars] = useState(cfg.chunker?.target_chars ?? 1400);
