@@ -1,12 +1,9 @@
 from __future__ import annotations
 import asyncio
 from typing import Protocol
-from sqlalchemy import select, func
-from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 from backend.core.models.chat import RetrievedChunk
 from backend.core.models.intent import IntentResult
 from backend.core.rag.protocols import LLMProvider, VectorStore
-from backend.db.models.knowledge import KnowledgeChunkORM
 
 
 class SearchChannel(Protocol):
@@ -47,37 +44,6 @@ class QuestionSearchChannel:
             top_k=top_k,
             knowledge_base_id=knowledge_base_id,
         )
-
-
-class KeywordSearchChannel:
-    def __init__(self, session_factory: async_sessionmaker[AsyncSession]) -> None:
-        self._session_factory = session_factory
-
-    async def search(
-        self, query: str, intent: IntentResult, top_k: int = 10
-    ) -> list[RetrievedChunk]:
-        knowledge_base_id = intent.matched_node.id if intent.matched_node else None
-        async with self._session_factory() as session:
-            tsquery = func.plainto_tsquery('simple', query)
-            rank_col = func.ts_rank(KnowledgeChunkORM.keywords_tsv, tsquery).label("rank")
-            stmt = (
-                select(KnowledgeChunkORM, rank_col)
-                .where(KnowledgeChunkORM.keywords_tsv.op("@@")(tsquery))
-                .order_by(rank_col.desc())
-                .limit(top_k)
-            )
-            if knowledge_base_id is not None:
-                stmt = stmt.where(KnowledgeChunkORM.knowledge_base_id == knowledge_base_id)
-            result = await session.execute(stmt)
-            return [
-                RetrievedChunk(
-                    content=row.KnowledgeChunkORM.content,
-                    score=float(row.rank),
-                    metadata=row.KnowledgeChunkORM.metadata_ or {},
-                    document_id=row.KnowledgeChunkORM.document_id,
-                )
-                for row in result.all()
-            ]
 
 
 class RrfProcessor:

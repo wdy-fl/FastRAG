@@ -29,6 +29,13 @@ class VectorStore(Protocol):
         knowledge_base_id: str | None = None,
     ) -> list[RetrievedChunk]: ...
 
+    async def search_questions(
+        self,
+        query_vector: list[float],
+        top_k: int,
+        knowledge_base_id: str | None,
+    ) -> list[RetrievedChunk]: ...
+
     async def upsert(
         self, chunks: list[ChunkWithEmbedding], metadata: dict
     ) -> None: ...

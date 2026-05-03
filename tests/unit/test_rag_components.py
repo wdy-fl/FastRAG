@@ -4,8 +4,9 @@ from backend.core.rag.rewrite import LLMQueryRewriter
 from backend.core.rag.intent import LLMIntentClassifier
 from backend.core.rag.retrieve import (
     MultiChannelRetriever, VectorSearchChannel,
-    QuestionSearchChannel, KeywordSearchChannel, RrfProcessor,
+    QuestionSearchChannel, RrfProcessor,
 )
+from backend.infra.search.keyword import KeywordSearchChannel
 from backend.core.rag.prompt import PromptBuilder
 from backend.core.models.chat import ConversationHistory, LLMEvent, RetrievedChunk
 from backend.core.models.intent import IntentNode, IntentResult
