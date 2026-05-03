@@ -40,7 +40,7 @@ export function KnowledgeDocumentsPage() {
   // Upload form state
   const [uploadFile, setUploadFile] = useState<File | null>(null);
   const [parserType, setParserType] = useState("markdown");
-  const [chunkerType, setChunkerType] = useState("recursive");
+  const [chunkerType, setChunkerType] = useState("structure_aware");
   const [chunkSize, setChunkSize] = useState(512);
   const [overlap, setOverlap] = useState(50);
   const [uploading, setUploading] = useState(false);
@@ -181,9 +181,10 @@ export function KnowledgeDocumentsPage() {
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="recursive">recursive</SelectItem>
+                  <SelectItem value="structure_aware">structure_aware</SelectItem>
                   <SelectItem value="fixed">fixed</SelectItem>
                   <SelectItem value="sentence">sentence</SelectItem>
+                  <SelectItem value="paragraph">paragraph</SelectItem>
                 </SelectContent>
               </Select>
             </div>

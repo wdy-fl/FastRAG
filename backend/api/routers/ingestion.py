@@ -1,6 +1,8 @@
 from __future__ import annotations
 import asyncio
-from fastapi import APIRouter, Depends
+import os
+import tempfile
+from fastapi import APIRouter, Depends, File, Form, UploadFile
 from pydantic import BaseModel
 from backend.api.deps import get_knowledge_repo, get_ingestion_engine
 from backend.db.repos.knowledge import KnowledgeRepo
@@ -15,16 +17,6 @@ from uuid import uuid4
 router = APIRouter()
 
 
-class TriggerIngestionRequest(BaseModel):
-    filename: str
-    source_type: str
-    source_uri: str
-    parser_type: str = "markdown"
-    chunker_type: str = "structure_aware"
-    chunk_size: int = 500
-    overlap: int = 50
-
-
 class TriggerIngestionResponse(BaseModel):
     document_id: str
     status: str
@@ -37,26 +29,42 @@ class TriggerIngestionResponse(BaseModel):
 )
 async def trigger_ingestion(
     kb_id: str,
-    body: TriggerIngestionRequest,
+    file: UploadFile = File(...),
+    parser_type: str = Form("markdown"),
+    chunker_type: str = Form("structure_aware"),
+    chunk_size: int = Form(500),
+    overlap: int = Form(50),
     repo: KnowledgeRepo = Depends(get_knowledge_repo),
     engine: IngestionEngine = Depends(get_ingestion_engine),
 ) -> TriggerIngestionResponse:
+    # Write uploaded file to a temp path for the local fetcher
+    suffix = os.path.splitext(file.filename or "")[1]
+    fd, tmp_path = tempfile.mkstemp(suffix=suffix)
+    try:
+        content = await file.read()
+        os.write(fd, content)
+    finally:
+        os.close(fd)
+
+    source_type = "local"
+    filename = file.filename or os.path.basename(tmp_path)
+
     doc = await repo.create_document(
         knowledge_base_id=kb_id,
-        filename=body.filename,
-        source_type=body.source_type,
-        source_uri=body.source_uri,
+        filename=filename,
+        source_type=source_type,
+        source_uri=tmp_path,
     )
 
     config = IngestionConfig(
         fetcher=FetcherSettings(
-            source_type=body.source_type, source_uri=body.source_uri
+            source_type=source_type, source_uri=tmp_path
         ),
-        parser=ParserSettings(parser_type=body.parser_type),
+        parser=ParserSettings(parser_type=parser_type),
         chunker=ChunkerSettings(
-            chunker_type=body.chunker_type,
-            chunk_size=body.chunk_size,
-            overlap=body.overlap,
+            chunker_type=chunker_type,
+            chunk_size=chunk_size,
+            overlap=overlap,
         ),
         indexer=IndexerSettings(),
     )
@@ -67,7 +75,7 @@ async def trigger_ingestion(
         metadata={
             "knowledge_base_id": kb_id,
             "document_id": doc.id,
-            "filename": body.filename,
+            "filename": filename,
         },
     )
 
@@ -83,6 +91,11 @@ async def trigger_ingestion(
             await repo.update_document_status(
                 doc.id, status="failed", error_message=str(exc)
             )
+        finally:
+            try:
+                os.unlink(tmp_path)
+            except OSError:
+                pass
 
     asyncio.create_task(_run())
     return TriggerIngestionResponse(document_id=doc.id, status=doc.status)
