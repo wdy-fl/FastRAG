@@ -87,6 +87,7 @@ async def chat_stream(
     task_id = str(uuid.uuid4())
 
     async def _managed_stream():
+        _task_registry[task_id] = asyncio.current_task()
         try:
             async for chunk in _event_stream(request, pipeline, task_id, llm, repo):
                 yield chunk
@@ -95,7 +96,6 @@ async def chat_stream(
         finally:
             _task_registry.pop(task_id, None)
 
-    _task_registry[task_id] = asyncio.current_task()  # type: ignore[assignment]
     return StreamingResponse(
         _managed_stream(),
         media_type="text/event-stream",

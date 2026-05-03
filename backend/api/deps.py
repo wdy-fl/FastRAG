@@ -6,7 +6,9 @@ from backend.infra.llm.client import OpenAICompatClient
 from backend.infra.vector.pgvector import PgVectorStore
 from backend.infra.cache.redis import RedisCache
 from backend.db.repos.conversation import ConversationRepo
+from backend.db.repos.intent import IntentRepo
 from backend.db.repos.knowledge import KnowledgeRepo
+from backend.db.repos.mapping import MappingRepo
 from backend.db.repos.trace import TraceRepo
 from backend.core.rag.memory import SlidingWindowMemory
 from backend.core.rag.rewrite import LLMQueryRewriter
@@ -154,10 +156,6 @@ def get_ingestion_engine() -> IngestionEngine:
             "indexer": IndexerNode(llm=get_embedding_provider(), vector_store=get_vector_store()),
         }
     )
-
-
-from backend.db.repos.intent import IntentRepo  # noqa: E402
-from backend.db.repos.mapping import MappingRepo  # noqa: E402
 
 
 def get_intent_repo(

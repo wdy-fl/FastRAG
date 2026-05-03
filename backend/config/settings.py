@@ -24,8 +24,6 @@ class Settings(BaseSettings):
     rag_summary_threshold: int = 5
     rag_retrieval_top_k: int = 10
     rag_intent_confidence_threshold: float = 0.6
-    s3_endpoint: str | None = None
-    s3_bucket: str = "fastrag"
 
     model_config = SettingsConfigDict(
         env_prefix="FASTRAG_",

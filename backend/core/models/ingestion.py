@@ -5,7 +5,7 @@ from backend.core.models.knowledge import DocumentChunk, ChunkWithEmbedding
 
 
 class FetcherSettings(BaseModel):
-    source_type: Literal["local", "s3", "http"]
+    source_type: Literal["local", "http"]
     source_uri: str
 
 

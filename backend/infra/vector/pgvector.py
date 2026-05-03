@@ -18,9 +18,10 @@ class PgVectorStore:
         knowledge_base_id: str | None = None,
     ) -> list[RetrievedChunk]:
         async with self._session_factory() as session:
+            distance_col = KnowledgeChunkORM.embedding.cosine_distance(query_vector).label("distance")
             stmt = (
-                select(KnowledgeChunkORM)
-                .order_by(KnowledgeChunkORM.embedding.cosine_distance(query_vector))
+                select(KnowledgeChunkORM, distance_col)
+                .order_by(distance_col)
                 .limit(top_k)
             )
             if knowledge_base_id is not None:
@@ -28,13 +29,13 @@ class PgVectorStore:
                     KnowledgeChunkORM.knowledge_base_id == knowledge_base_id
                 )
             result = await session.execute(stmt)
-            rows = result.scalars().all()
+            rows = result.all()
             return [
                 RetrievedChunk(
-                    content=row.content,
-                    score=1.0,  # cosine_distance doesn't return score directly; caller can rerank
-                    metadata=row.metadata_ or {},
-                    document_id=row.document_id,
+                    content=row.KnowledgeChunkORM.content,
+                    score=1.0 - row.distance,
+                    metadata=row.KnowledgeChunkORM.metadata_ or {},
+                    document_id=row.KnowledgeChunkORM.document_id,
                 )
                 for row in rows
             ]
