@@ -1,7 +1,8 @@
 from backend.db.models.base import Base
 from backend.db.models.conversation import ConversationORM, MessageORM, ConversationSummaryORM
 from backend.db.models.knowledge import (
-    KnowledgeBaseORM, KnowledgeDocumentORM, KnowledgeChunkORM, QueryTermMappingORM
+    KnowledgeBaseORM, KnowledgeDocumentORM, KnowledgeChunkORM,
+    QueryTermMappingORM, KnowledgeDocQuestionORM
 )
 from backend.db.models.ingestion import IngestionTaskORM
 from backend.db.models.intent import IntentNodeORM
@@ -11,6 +12,7 @@ __all__ = [
     "Base",
     "ConversationORM", "MessageORM", "ConversationSummaryORM",
     "KnowledgeBaseORM", "KnowledgeDocumentORM", "KnowledgeChunkORM", "QueryTermMappingORM",
+    "KnowledgeDocQuestionORM",
     "IngestionTaskORM",
     "IntentNodeORM",
     "RagTraceRunORM", "RagTraceNodeORM",

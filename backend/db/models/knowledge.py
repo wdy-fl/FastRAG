@@ -1,6 +1,7 @@
 from __future__ import annotations
 from datetime import datetime
 from sqlalchemy import ForeignKey, JSON, String, Text, func
+from sqlalchemy.dialects.postgresql import TSVECTOR
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from pgvector.sqlalchemy import Vector
 from backend.db.models.base import Base
@@ -51,6 +52,7 @@ class KnowledgeChunkORM(Base):
     chunk_index: Mapped[int] = mapped_column()
     embedding: Mapped[list[float]] = mapped_column(Vector(_EMBEDDING_DIM))
     metadata_: Mapped[dict] = mapped_column("metadata", JSON, default={})
+    keywords_tsv: Mapped[str | None] = mapped_column(TSVECTOR, nullable=True)
     created_at: Mapped[datetime] = mapped_column(server_default=func.now())
 
 
@@ -63,4 +65,15 @@ class QueryTermMappingORM(Base):
     knowledge_base_id: Mapped[str | None] = mapped_column(
         ForeignKey("knowledge_bases.id"), nullable=True
     )
+    created_at: Mapped[datetime] = mapped_column(server_default=func.now())
+
+
+class KnowledgeDocQuestionORM(Base):
+    __tablename__ = "knowledge_doc_questions"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    document_id: Mapped[str] = mapped_column(ForeignKey("knowledge_documents.id"))
+    knowledge_base_id: Mapped[str] = mapped_column(ForeignKey("knowledge_bases.id"))
+    question: Mapped[str] = mapped_column(Text)
+    embedding: Mapped[list[float]] = mapped_column(Vector(_EMBEDDING_DIM))
     created_at: Mapped[datetime] = mapped_column(server_default=func.now())
