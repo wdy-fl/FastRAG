@@ -2,7 +2,7 @@ from __future__ import annotations
 from uuid import uuid4
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 from backend.core.models.ingestion import IndexerSettings, IngestionContext
-from backend.core.models.knowledge import ChunkWithEmbedding
+from backend.core.models.knowledge import ChunkWithEmbedding, DocumentChunk
 from backend.core.rag.protocols import LLMProvider, VectorStore
 from backend.core.exceptions import IngestionError
 from backend.db.models.knowledge import KnowledgeDocQuestionORM
@@ -34,8 +34,13 @@ class IndexerNode:
             vectors = await self._llm.embed(texts)
             for chunk, vector in zip(batch, vectors):
                 keywords: list[str] = chunk.metadata.get("keywords", [])
-                chunk.metadata["_keywords_str"] = " ".join(keywords)
-                embedded.append(ChunkWithEmbedding(chunk=chunk, embedding=vector))
+                enriched_metadata = {**chunk.metadata, "_keywords_str": " ".join(keywords)}
+                chunk_copy = DocumentChunk(
+                    content=chunk.content,
+                    chunk_index=chunk.chunk_index,
+                    metadata=enriched_metadata,
+                )
+                embedded.append(ChunkWithEmbedding(chunk=chunk_copy, embedding=vector))
 
         await self._vector_store.upsert(embedded, metadata=context.metadata)
         context.embedded_chunks = embedded
@@ -48,14 +53,19 @@ class IndexerNode:
     async def _persist_questions(self, context: IngestionContext) -> None:
         document_id = context.metadata.get("document_id", "")
         knowledge_base_id = context.metadata.get("knowledge_base_id", "")
+        if not document_id or not knowledge_base_id:
+            return
         embeddings = await self._llm.embed(context.questions)
-        async with self._session_factory() as session:
-            for question, embedding in zip(context.questions, embeddings):
-                session.add(KnowledgeDocQuestionORM(
-                    id=str(uuid4()),
-                    document_id=document_id,
-                    knowledge_base_id=knowledge_base_id,
-                    question=question,
-                    embedding=embedding,
-                ))
-            await session.commit()
+        try:
+            async with self._session_factory() as session:
+                for question, embedding in zip(context.questions, embeddings):
+                    session.add(KnowledgeDocQuestionORM(
+                        id=str(uuid4()),
+                        document_id=document_id,
+                        knowledge_base_id=knowledge_base_id,
+                        question=question,
+                        embedding=embedding,
+                    ))
+                await session.commit()
+        except Exception as exc:
+            raise IngestionError(f"Failed to persist questions: {exc}") from exc
