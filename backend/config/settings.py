@@ -15,11 +15,16 @@ class EmbeddingSettings(BaseModel):
     dimensions: int = 1024
 
 
+class IngestionSettings(BaseModel):
+    task_timeout_seconds: int = 600  # 默认 10 分钟
+
+
 class Settings(BaseSettings):
     database_url: str = "postgresql+asyncpg://postgres:postgres@localhost:5432/fastrag"
     redis_url: str = "redis://localhost:6379/0"
     llm: LLMSettings = LLMSettings()
     embedding: EmbeddingSettings = EmbeddingSettings()
+    ingestion: IngestionSettings = IngestionSettings()
     rag_window_size: int = 4
     rag_summary_threshold: int = 5
     rag_retrieval_top_k: int = 10

@@ -145,3 +145,44 @@ async def test_engine_records_failure_and_raises():
 
     assert context.node_results[0].status == "failed"
     assert "fetch failed" in context.node_results[0].error
+
+
+@pytest.mark.asyncio
+async def test_engine_calls_on_node_complete_callback():
+    """回调在每个成功节点后触发，携带节点名称和 NodeResult。"""
+    calls = []
+
+    async def callback(node_name: str, result):
+        calls.append((node_name, result.status))
+
+    class DummyNode:
+        name = "fetcher"
+        async def execute(self, ctx, cfg):
+            return ctx
+
+    engine = IngestionEngine(nodes={"fetcher": DummyNode()})
+    config = _make_config()
+    context = _make_context(config)
+    await engine.execute(config, context, on_node_complete=callback)
+    assert ("fetcher", "success") in calls
+
+
+@pytest.mark.asyncio
+async def test_engine_calls_callback_on_failure():
+    """节点失败时也触发回调，status 为 failed。"""
+    calls = []
+
+    async def callback(node_name: str, result):
+        calls.append((node_name, result.status))
+
+    class FailNode:
+        name = "fetcher"
+        async def execute(self, ctx, cfg):
+            raise RuntimeError("boom")
+
+    engine = IngestionEngine(nodes={"fetcher": FailNode()})
+    config = _make_config()
+    context = _make_context(config)
+    with pytest.raises(RuntimeError):
+        await engine.execute(config, context, on_node_complete=callback)
+    assert ("fetcher", "failed") in calls

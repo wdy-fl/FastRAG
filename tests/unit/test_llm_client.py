@@ -97,3 +97,14 @@ async def test_stream_yields_thinking_events():
 
     assert events[0] == LLMEvent(type="thinking", content="thinking...")
     await client.close()
+
+
+@pytest.mark.asyncio
+async def test_chat_returns_content():
+    client = OpenAICompatClient(base_url="http://test", api_key="k", model="m")
+    response_body = {"choices": [{"message": {"content": "hello"}}]}
+    transport = httpx.MockTransport(lambda req: httpx.Response(200, json=response_body))
+    client._http = httpx.AsyncClient(transport=transport)
+    result = await client.chat([{"role": "user", "content": "hi"}])
+    assert result == "hello"
+    await client.close()

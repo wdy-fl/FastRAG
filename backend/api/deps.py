@@ -10,6 +10,7 @@ from backend.db.repos.intent import IntentRepo
 from backend.db.repos.knowledge import KnowledgeRepo
 from backend.db.repos.mapping import MappingRepo
 from backend.db.repos.trace import TraceRepo
+from backend.db.repos.ingestion_task import IngestionTaskRepo
 from backend.core.rag.memory import SlidingWindowMemory
 from backend.core.rag.rewrite import LLMQueryRewriter
 from backend.core.rag.intent import LLMIntentClassifier
@@ -22,6 +23,8 @@ from backend.core.ingestion.nodes.fetcher import FetcherNode
 from backend.core.ingestion.nodes.parser import ParserNode
 from backend.core.ingestion.nodes.chunker import ChunkerNode
 from backend.core.ingestion.nodes.indexer import IndexerNode
+from backend.core.ingestion.nodes.enhancer import EnhancerNode
+from backend.core.ingestion.nodes.enricher import EnricherNode
 from backend.core.ingestion.strategies.fetcher.local import LocalFileFetcher
 from backend.core.ingestion.strategies.fetcher.http import HttpUrlFetcher
 from backend.core.ingestion.strategies.parser.markdown import MarkdownParser
@@ -143,7 +146,7 @@ def get_ingestion_engine() -> IngestionEngine:
                     "markdown": MarkdownParser(),
                 }
             ),
-            "enhancer": None,
+            "enhancer": EnhancerNode(llm=llm),
             "chunker": ChunkerNode(
                 strategies={
                     "fixed": FixedSizeChunker(),
@@ -152,7 +155,7 @@ def get_ingestion_engine() -> IngestionEngine:
                     "structure_aware": StructureAwareChunker(),
                 }
             ),
-            "enricher": None,
+            "enricher": EnricherNode(llm=llm),
             "indexer": IndexerNode(llm=get_embedding_provider(), vector_store=get_vector_store()),
         }
     )
@@ -168,3 +171,9 @@ def get_mapping_repo(
     session: AsyncSession = Depends(get_db_session),
 ) -> MappingRepo:
     return MappingRepo(session)
+
+
+def get_ingestion_task_repo(
+    session: AsyncSession = Depends(get_db_session),
+) -> IngestionTaskRepo:
+    return IngestionTaskRepo(session)

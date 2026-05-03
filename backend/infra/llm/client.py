@@ -60,5 +60,19 @@ class OpenAICompatClient:
         resp.raise_for_status()
         return [item["embedding"] for item in resp.json()["data"]]
 
+    async def chat(
+        self, messages: list[dict], model: str | None = None, **kwargs
+    ) -> str:
+        url = f"{self.base_url}/chat/completions"
+        payload = {
+            "model": model or self.model,
+            "messages": messages,
+            "stream": False,
+            **kwargs,
+        }
+        resp = await self._http.post(url, json=payload, headers=self._auth_headers())
+        resp.raise_for_status()
+        return resp.json()["choices"][0]["message"]["content"]
+
     async def close(self) -> None:
         await self._http.aclose()

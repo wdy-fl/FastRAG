@@ -23,7 +23,10 @@ async def test_search_returns_retrieved_chunks():
         metadata_={"filename": "test.pdf"},
     )
     mock_result = MagicMock()
-    mock_result.scalars.return_value.all.return_value = [mock_orm]
+    mock_row = MagicMock()
+    mock_row.KnowledgeChunkORM = mock_orm
+    mock_row.distance = 0.1
+    mock_result.all.return_value = [mock_row]
     mock_session.execute = AsyncMock(return_value=mock_result)
 
     store = PgVectorStore(session_factory=mock_session_factory)

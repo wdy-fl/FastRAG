@@ -1,20 +1,15 @@
 import pytest
-from unittest.mock import AsyncMock
+from unittest.mock import AsyncMock, MagicMock
 from backend.core.rag.rewrite import LLMQueryRewriter
 from backend.core.rag.intent import LLMIntentClassifier
 from backend.core.rag.retrieve import MultiChannelRetriever, VectorSearchChannel, DeduplicationProcessor
 from backend.core.rag.prompt import PromptBuilder
 from backend.core.models.chat import ConversationHistory, LLMEvent, RetrievedChunk
-from backend.core.models.intent import IntentResult
+from backend.core.models.intent import IntentNode, IntentResult
 
 
-async def _make_llm_stream(content: str):
-    async def _gen():
-        yield LLMEvent(type="content", content=content)
-    return _gen()
-
-
-def _sync_make_llm_stream(content: str):
+def _make_stream(content: str):
+    """返回 async generator，用于 mock llm.stream()。"""
     async def _gen():
         yield LLMEvent(type="content", content=content)
     return _gen()
@@ -22,8 +17,8 @@ def _sync_make_llm_stream(content: str):
 
 @pytest.mark.asyncio
 async def test_rewriter_rewrite_returns_string():
-    mock_llm = AsyncMock()
-    mock_llm.stream = AsyncMock(side_effect=lambda msgs, **kw: _sync_make_llm_stream("Rewritten query"))
+    mock_llm = MagicMock()
+    mock_llm.stream = MagicMock(side_effect=lambda msgs, **kw: _make_stream("Rewritten query"))
 
     rewriter = LLMQueryRewriter(llm=mock_llm)
     result = await rewriter.rewrite("what is ml?", ConversationHistory())
@@ -33,9 +28,9 @@ async def test_rewriter_rewrite_returns_string():
 
 @pytest.mark.asyncio
 async def test_rewriter_split_returns_list():
-    mock_llm = AsyncMock()
-    mock_llm.stream = AsyncMock(
-        side_effect=lambda msgs, **kw: _sync_make_llm_stream("1. What is ML?\n2. How does it work?")
+    mock_llm = MagicMock()
+    mock_llm.stream = MagicMock(
+        side_effect=lambda msgs, **kw: _make_stream("1. What is ML?\n2. How does it work?")
     )
     rewriter = LLMQueryRewriter(llm=mock_llm)
     parts = await rewriter.split("What is ML and how does it work?")
@@ -45,9 +40,9 @@ async def test_rewriter_split_returns_list():
 
 @pytest.mark.asyncio
 async def test_classifier_returns_intent_result():
-    mock_llm = AsyncMock()
-    mock_llm.stream = AsyncMock(
-        side_effect=lambda msgs, **kw: _sync_make_llm_stream('{"confidence": 0.9, "matched_id": null}')
+    mock_llm = MagicMock()
+    mock_llm.stream = MagicMock(
+        side_effect=lambda msgs, **kw: _make_stream('{"confidence": 0.9, "matched_id": null}')
     )
     classifier = LLMIntentClassifier(llm=mock_llm, intent_nodes=[], confidence_threshold=0.6)
     result = await classifier.classify("What is machine learning?")
@@ -56,11 +51,13 @@ async def test_classifier_returns_intent_result():
 
 @pytest.mark.asyncio
 async def test_classifier_low_confidence_needs_guidance():
-    mock_llm = AsyncMock()
-    mock_llm.stream = AsyncMock(
-        side_effect=lambda msgs, **kw: _sync_make_llm_stream('{"confidence": 0.3, "matched_id": null}')
+    mock_llm = MagicMock()
+    mock_llm.stream = MagicMock(
+        side_effect=lambda msgs, **kw: _make_stream('{"confidence": 0.3, "matched_id": null}')
     )
-    classifier = LLMIntentClassifier(llm=mock_llm, intent_nodes=[], confidence_threshold=0.6)
+    # 需要提供至少一个节点，否则 classifier 直接跳过不走 LLM
+    dummy_node = IntentNode(id="n1", name="General", level="domain")
+    classifier = LLMIntentClassifier(llm=mock_llm, intent_nodes=[dummy_node], confidence_threshold=0.6)
     result = await classifier.classify("ambiguous question")
     assert result.needs_guidance is True
 
