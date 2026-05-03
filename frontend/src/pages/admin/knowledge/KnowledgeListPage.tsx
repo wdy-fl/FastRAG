@@ -28,6 +28,7 @@ import { Input } from "@/components/ui/input";
 import type { KnowledgeBase } from "@/types";
 import { knowledgeService } from "@/services/knowledgeService";
 import { CreateKnowledgeBaseDialog } from "@/components/admin/CreateKnowledgeBaseDialog";
+import { KbIngestionConfigDialog } from "@/components/admin/KbIngestionConfigDialog";
 import { getErrorMessage } from "@/utils/error";
 
 export function KnowledgeListPage() {
@@ -38,6 +39,7 @@ export function KnowledgeListPage() {
   const [loading, setLoading] = useState(true);
   const [deleteTarget, setDeleteTarget] = useState<KnowledgeBase | null>(null);
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
+  const [configKb, setConfigKb] = useState<KnowledgeBase | null>(null);
   const [searchName, setSearchName] = useState(nameFromQuery);
 
   const loadKnowledgeBases = async () => {
@@ -149,6 +151,13 @@ export function KnowledgeListPage() {
                           文档管理
                         </Button>
                         <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setConfigKb(kb)}
+                        >
+                          摄取配置
+                        </Button>
+                        <Button
                           variant="ghost"
                           size="sm"
                           className="text-destructive hover:text-destructive"
@@ -191,6 +200,20 @@ export function KnowledgeListPage() {
         onOpenChange={setCreateDialogOpen}
         onSuccess={() => loadKnowledgeBases()}
       />
+
+      {/* 摄取配置对话框 */}
+      {configKb && (
+        <KbIngestionConfigDialog
+          key={configKb.id}
+          kb={configKb}
+          open={!!configKb}
+          onOpenChange={(v) => { if (!v) setConfigKb(null); }}
+          onSaved={(updated) => {
+            setKnowledgeBases((prev) => prev.map((k) => k.id === updated.id ? updated : k));
+            setConfigKb(null);
+          }}
+        />
+      )}
     </div>
   );
 }

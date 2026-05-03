@@ -9,17 +9,12 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 
 import type { KnowledgeBase, Document } from "@/types";
 import { knowledgeService } from "@/services/knowledgeService";
-
-const statusColors: Record<string, string> = {
-  pending:   "bg-blue-100 text-blue-800",
-  completed: "bg-green-100 text-green-800",
-  failed:    "bg-red-100 text-red-800",
-};
+import { STATUS_COLORS, STATUS_LABELS, IN_PROGRESS_STATUSES } from "@/utils/documentStatus";
+import { IngestionTaskDetailDrawer } from "@/components/admin/IngestionTaskDetailDrawer";
 
 const formatDate = (value?: string | null) => {
   if (!value) return "-";
@@ -36,13 +31,10 @@ export function KnowledgeDocumentsPage() {
   const [documents, setDocuments] = useState<Document[]>([]);
   const [loading, setLoading] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<Document | null>(null);
+  const [detailDoc, setDetailDoc] = useState<Document | null>(null);
 
   // Upload form state
   const [uploadFile, setUploadFile] = useState<File | null>(null);
-  const [parserType, setParserType] = useState("markdown");
-  const [chunkerType, setChunkerType] = useState("structure_aware");
-  const [chunkSize, setChunkSize] = useState(512);
-  const [overlap, setOverlap] = useState(50);
   const [uploading, setUploading] = useState(false);
 
   const loadKnowledgeBase = async () => {
@@ -78,10 +70,10 @@ export function KnowledgeDocumentsPage() {
     fetchDocuments();
   }, [kbId]);
 
-  // Poll every 3s when any document is still processing
+  // Poll every 3s when any document is still in-progress
   useEffect(() => {
-    const hasProcessing = documents.some((d) => d.status === "pending");
-    if (!hasProcessing) return;
+    const hasInProgress = documents.some((d) => IN_PROGRESS_STATUSES.includes(d.status));
+    if (!hasInProgress) return;
     const timer = setInterval(fetchDocuments, 3000);
     return () => clearInterval(timer);
   }, [documents]);
@@ -90,13 +82,7 @@ export function KnowledgeDocumentsPage() {
     if (!uploadFile || !kbId) return;
     setUploading(true);
     try {
-      await knowledgeService.uploadDocument(kbId, {
-        file: uploadFile,
-        parser_type: parserType,
-        chunker_type: chunkerType,
-        chunk_size: chunkSize,
-        overlap,
-      });
+      await knowledgeService.uploadDocument(kbId, uploadFile);
       toast.success("文档上传成功，正在处理中...");
       setUploadFile(null);
       fetchDocuments();
@@ -142,80 +128,21 @@ export function KnowledgeDocumentsPage() {
             <FileUp className="h-4 w-4" />
             上传文档
           </CardTitle>
-          <CardDescription>选择文件并配置解析与分块参数</CardDescription>
+          <CardDescription>选择文件上传至知识库</CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
-            <div className="xl:col-span-2">
-              <Label htmlFor="upload-file" className="mb-2 block text-sm font-medium">
-                选择文件
-              </Label>
-              <Input
-                id="upload-file"
-                type="file"
-                onChange={(e) => setUploadFile(e.target.files?.[0] ?? null)}
-              />
-            </div>
-
-            <div>
-              <Label htmlFor="parser-type" className="mb-2 block text-sm font-medium">
-                解析器
-              </Label>
-              <Select value={parserType} onValueChange={setParserType}>
-                <SelectTrigger id="parser-type">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="unstructured">unstructured</SelectItem>
-                  <SelectItem value="markdown">markdown</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div>
-              <Label htmlFor="chunker-type" className="mb-2 block text-sm font-medium">
-                分块策略
-              </Label>
-              <Select value={chunkerType} onValueChange={setChunkerType}>
-                <SelectTrigger id="chunker-type">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="structure_aware">structure_aware</SelectItem>
-                  <SelectItem value="fixed">fixed</SelectItem>
-                  <SelectItem value="sentence">sentence</SelectItem>
-                  <SelectItem value="paragraph">paragraph</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div>
-              <Label htmlFor="chunk-size" className="mb-2 block text-sm font-medium">
-                块大小
-              </Label>
-              <Input
-                id="chunk-size"
-                type="number"
-                min={64}
-                max={4096}
-                value={chunkSize}
-                onChange={(e) => setChunkSize(Number(e.target.value))}
-              />
-            </div>
-
-            <div>
-              <Label htmlFor="overlap" className="mb-2 block text-sm font-medium">
-                重叠大小
-              </Label>
-              <Input
-                id="overlap"
-                type="number"
-                min={0}
-                max={512}
-                value={overlap}
-                onChange={(e) => setOverlap(Number(e.target.value))}
-              />
-            </div>
+          <div className="max-w-sm">
+            <Label htmlFor="upload-file" className="mb-2 block text-sm font-medium">
+              选择文件
+            </Label>
+            <Input
+              id="upload-file"
+              type="file"
+              onChange={(e) => setUploadFile(e.target.files?.[0] ?? null)}
+            />
+            <p className="text-xs text-muted-foreground mt-1">
+              解析与分块策略由知识库摄取配置决定，可在知识库设置中调整。
+            </p>
           </div>
 
           <div className="mt-4">
@@ -282,24 +209,33 @@ export function KnowledgeDocumentsPage() {
                       <span
                         className={cn(
                           "inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium",
-                          statusColors[doc.status] ?? "bg-gray-100 text-gray-700"
+                          STATUS_COLORS[doc.status] ?? "bg-gray-100 text-gray-700"
                         )}
                       >
-                        {doc.status}
+                        {STATUS_LABELS[doc.status] ?? doc.status}
                       </span>
                     </TableCell>
                     <TableCell>{doc.chunk_count ?? "-"}</TableCell>
                     <TableCell>{formatDate(doc.created_at)}</TableCell>
                     <TableCell className="text-right">
-                      <Button
-                        size="icon"
-                        variant="ghost"
-                        className="text-destructive hover:text-destructive"
-                        onClick={() => setDeleteTarget(doc)}
-                        title="删除"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
+                      <div className="flex justify-end gap-1">
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => setDetailDoc(doc)}
+                        >
+                          详情
+                        </Button>
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          className="text-destructive hover:text-destructive"
+                          onClick={() => setDeleteTarget(doc)}
+                          title="删除"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
                     </TableCell>
                   </TableRow>
                 ))}
@@ -331,6 +267,16 @@ export function KnowledgeDocumentsPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {detailDoc && (
+        <IngestionTaskDetailDrawer
+          kbId={kbId!}
+          docId={detailDoc.id}
+          filename={detailDoc.filename}
+          open={!!detailDoc}
+          onOpenChange={(v) => { if (!v) setDetailDoc(null); }}
+        />
+      )}
     </div>
   );
 }

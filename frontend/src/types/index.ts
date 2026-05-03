@@ -1,11 +1,13 @@
 // FastRAG 核心类型定义
 
-export interface KnowledgeBase {
-  id: string;
-  name: string;
-  description: string;
-  created_at: string;
-}
+export type DocumentStatus =
+  | "pending"
+  | "fetching"
+  | "parsing"
+  | "chunking"
+  | "embedding"
+  | "completed"
+  | "failed";
 
 export interface Document {
   id: string;
@@ -13,9 +15,64 @@ export interface Document {
   filename: string;
   source_type: string;
   source_uri: string;
-  status: "processing" | "done" | "failed";
-  chunk_count: number;
+  status: DocumentStatus;
+  chunk_count: number | null;
   created_at: string;
+}
+
+// 知识库级摄取配置（对应后端 IngestionConfig Pydantic 模型）
+// 注意：后端 IngestionConfig 还包含 fetcher 字段，但路由在触发摄取时
+// 会硬编码注入 fetcher（source_type="local", source_uri=临时文件路径），
+// 不从 KB 级 ingestion_config 中读取，故前端无需暴露此字段。
+export interface IngestionConfig {
+  parser?: {
+    parser_type?: "unstructured" | "markdown";
+  };
+  chunker?: {
+    chunker_type?: "structure_aware" | "fixed" | "sentence" | "paragraph";
+    chunk_size?: number;
+    overlap?: number;
+    min_chars?: number;
+    target_chars?: number;
+    max_chars?: number;
+  };
+  indexer?: {
+    batch_size?: number;
+  };
+  // enhancer/enricher 为 null/undefined 表示禁用，后端无 enabled 字段
+  enhancer?: {
+    model_id?: string;
+    tasks?: Array<{
+      type: "context_enhance" | "keywords" | "questions" | "metadata";
+    }>;
+  } | null;
+  enricher?: {
+    model_id?: string;
+    attach_document_metadata?: boolean;
+    tasks?: Array<{
+      type: "keywords" | "summary" | "metadata";
+    }>;
+  } | null;
+}
+
+export interface KnowledgeBase {
+  id: string;
+  name: string;
+  description: string;
+  ingestion_config: IngestionConfig;
+  created_at: string;
+}
+
+// 摄取任务详情（对应后端 IngestionTaskResponse）
+export interface IngestionTaskResponse {
+  task_id: string;
+  document_id: string;
+  status: DocumentStatus;
+  started_at: string | null;
+  finished_at: string | null;
+  chunk_count: number | null;
+  error: string | null;
+  node_timings: Record<string, number>; // key: 节点名，value: 耗时 ms（仅含成功节点）
 }
 
 export interface Conversation {
