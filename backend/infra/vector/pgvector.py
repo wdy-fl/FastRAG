@@ -85,7 +85,8 @@ class PgVectorStore:
         document_id = metadata.get("document_id", "")
         async with self._session_factory() as session:
             for item in chunks:
-                keywords_str: str = item.chunk.metadata.pop("_keywords_str", "") or ""
+                chunk_meta = dict(item.chunk.metadata)  # 浅拷贝，隔离副作用
+                keywords_str: str = chunk_meta.pop("_keywords_str", "") or ""
                 session.add(
                     KnowledgeChunkORM(
                         id=str(uuid4()),
@@ -94,7 +95,7 @@ class PgVectorStore:
                         content=item.chunk.content,
                         chunk_index=item.chunk.chunk_index,
                         embedding=item.embedding,
-                        metadata_=item.chunk.metadata,
+                        metadata_=chunk_meta,
                         keywords_tsv=func.to_tsvector('simple', keywords_str) if keywords_str else None,
                     )
                 )
