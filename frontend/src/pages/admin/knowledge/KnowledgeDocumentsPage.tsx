@@ -70,13 +70,6 @@ export function KnowledgeDocumentsPage() {
     fetchDocuments();
   }, [kbId]);
 
-  // Poll every 3s when any document is still in-progress
-  useEffect(() => {
-    const hasInProgress = documents.some((d) => IN_PROGRESS_STATUSES.includes(d.status));
-    if (!hasInProgress) return;
-    const timer = setInterval(fetchDocuments, 3000);
-    return () => clearInterval(timer);
-  }, [documents]);
 
   const handleUpload = async () => {
     if (!uploadFile || !kbId) return;
