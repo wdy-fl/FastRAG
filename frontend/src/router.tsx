@@ -7,7 +7,9 @@ import { KnowledgeDocumentsPage } from "./pages/admin/knowledge/KnowledgeDocumen
 import { IntentListPage } from "./pages/admin/intent-tree/IntentListPage";
 import { IntentEditPage } from "./pages/admin/intent-tree/IntentEditPage";
 import { RagTracePage } from "./pages/admin/traces/RagTracePage";
+import { RagTraceDetailPage } from "./pages/admin/traces/RagTraceDetailPage";
 import { MappingPage } from "./pages/admin/mapping/MappingPage";
+import { KnowledgeDocumentDetailPage } from "./pages/admin/knowledge/KnowledgeDocumentDetailPage";
 
 export const router = createBrowserRouter([
   { path: "/", element: <Navigate to="/chat" replace /> },
@@ -20,9 +22,11 @@ export const router = createBrowserRouter([
       { index: true, element: <Navigate to="/admin/knowledge" replace /> },
       { path: "knowledge", element: <KnowledgeListPage /> },
       { path: "knowledge/:kbId", element: <KnowledgeDocumentsPage /> },
+      { path: "knowledge/:kbId/docs/:docId", element: <KnowledgeDocumentDetailPage /> },
       { path: "intent-list", element: <IntentListPage /> },
       { path: "intent-list/:id/edit", element: <IntentEditPage /> },
       { path: "traces", element: <RagTracePage /> },
+      { path: "traces/:runId", element: <RagTraceDetailPage /> },
       { path: "mapping", element: <MappingPage /> },
     ],
   },

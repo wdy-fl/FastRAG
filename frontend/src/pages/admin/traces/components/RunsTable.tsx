@@ -1,4 +1,3 @@
-import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -47,6 +46,7 @@ interface RunsTableProps {
   total: number;
   onPrevPage: () => void;
   onNextPage: () => void;
+  onViewDetail: (runId: string) => void;
 }
 
 export function RunsTable({
@@ -56,7 +56,8 @@ export function RunsTable({
   pages,
   total,
   onPrevPage,
-  onNextPage
+  onNextPage,
+  onViewDetail,
 }: RunsTableProps) {
   return (
     <Card className="trace-list-table-card">
@@ -115,7 +116,7 @@ export function RunsTable({
                         size="sm"
                         variant="outline"
                         className="trace-list-action-btn"
-                        onClick={() => toast.info("Trace 详情功能开发中")}
+                        onClick={() => onViewDetail(run.id)}
                       >
                         <Eye className="h-3.5 w-3.5" />
                         查看链路

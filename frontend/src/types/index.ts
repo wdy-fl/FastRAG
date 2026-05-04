@@ -75,6 +75,21 @@ export interface IngestionTaskResponse {
   node_timings: Record<string, number>; // key: 节点名，value: 耗时 ms（仅含成功节点）
 }
 
+export interface Chunk {
+  id: string;
+  chunk_index: number;
+  content: string;
+  metadata: Record<string, unknown>;
+  created_at: string;
+}
+
+export interface ChunkListResponse {
+  total: number;
+  page: number;
+  page_size: number;
+  items: Chunk[];
+}
+
 export interface Conversation {
   id: string;
   title: string;
@@ -99,6 +114,17 @@ export interface TraceRun {
   status: "running" | "success" | "failed";
   total_duration_ms: number;
   created_at: string;
+}
+
+export interface TraceNode {
+  node_name: string;
+  status: string;
+  duration_ms: number;
+  error: string | null;
+}
+
+export interface TraceRunDetail extends TraceRun {
+  nodes: TraceNode[];
 }
 
 export interface IntentNode {

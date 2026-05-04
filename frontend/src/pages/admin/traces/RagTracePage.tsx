@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useNavigate } from "react-router-dom";
 import { Activity, Clock3, Layers, RefreshCw, Search, TrendingUp } from "lucide-react";
 import { toast } from "sonner";
 
@@ -29,6 +30,7 @@ const formatDurationMetric = (durationMs: number): DurationMetric => {
 };
 
 export function RagTracePage() {
+  const navigate = useNavigate();
   const runsRequestRef = useRef(0);
   const [queryFilter, setQueryFilter] = useState("");
   const [pageNo, setPageNo] = useState(1);
@@ -178,6 +180,7 @@ export function RagTracePage() {
           total={total}
           onPrevPage={() => setPageNo((prev) => Math.max(1, prev - 1))}
           onNextPage={() => setPageNo((prev) => Math.min(pages, prev + 1))}
+          onViewDetail={(id) => navigate(`/admin/traces/${id}`)}
         />
       </div>
     </div>
