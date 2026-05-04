@@ -1,6 +1,6 @@
 from __future__ import annotations
 from uuid import uuid4
-from sqlalchemy import select
+from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 from backend.db.models.knowledge import (
     KnowledgeBaseORM, KnowledgeDocumentORM, KnowledgeChunkORM, KnowledgeDocQuestionORM
@@ -119,3 +119,23 @@ class KnowledgeRepo:
             )
         )
         return list(result.scalars().all())
+
+    async def list_chunks_by_document(
+        self, doc_id: str, page: int = 1, page_size: int = 20
+    ) -> tuple[list[KnowledgeChunkORM], int]:
+        count_stmt = (
+            select(func.count())
+            .select_from(KnowledgeChunkORM)
+            .where(KnowledgeChunkORM.document_id == doc_id)
+        )
+        total = (await self._session.execute(count_stmt)).scalar_one()
+
+        stmt = (
+            select(KnowledgeChunkORM)
+            .where(KnowledgeChunkORM.document_id == doc_id)
+            .order_by(KnowledgeChunkORM.chunk_index)
+            .offset((page - 1) * page_size)
+            .limit(page_size)
+        )
+        chunks = list((await self._session.execute(stmt)).scalars().all())
+        return chunks, total

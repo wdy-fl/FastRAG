@@ -3,7 +3,7 @@ import asyncio
 import os
 import tempfile
 from datetime import datetime, timezone
-from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
+from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile, status
 from pydantic import BaseModel
 from backend.api.deps import (
     get_ingestion_engine,
@@ -57,6 +57,21 @@ class IngestionTaskResponse(BaseModel):
     chunk_count: int | None
     error: str | None
     node_timings: dict[str, int]
+
+
+class ChunkResponse(BaseModel):
+    id: str
+    chunk_index: int
+    content: str
+    metadata: dict
+    created_at: datetime
+
+
+class ChunkListResponse(BaseModel):
+    total: int
+    page: int
+    page_size: int
+    items: list[ChunkResponse]
 
 
 def _build_config(kb_ingestion_config: dict, tmp_path: str) -> IngestionConfig:
@@ -251,4 +266,36 @@ async def get_ingestion_task(
         chunk_count=task.chunk_count,
         error=task.error_message,
         node_timings=node_timings,
+    )
+
+
+@router.get(
+    "/knowledge-bases/{kb_id}/documents/{doc_id}/chunks",
+    response_model=ChunkListResponse,
+)
+async def list_chunks(
+    kb_id: str,
+    doc_id: str,
+    page: int = Query(default=1, ge=1),
+    page_size: int = Query(default=20, ge=1, le=100),
+    repo: KnowledgeRepo = Depends(get_knowledge_repo),
+) -> ChunkListResponse:
+    doc = await repo.get_document(doc_id)
+    if not doc or doc.knowledge_base_id != kb_id:
+        raise HTTPException(status_code=404, detail="Document not found")
+    chunks, total = await repo.list_chunks_by_document(doc_id, page, page_size)
+    return ChunkListResponse(
+        total=total,
+        page=page,
+        page_size=page_size,
+        items=[
+            ChunkResponse(
+                id=c.id,
+                chunk_index=c.chunk_index,
+                content=c.content,
+                metadata=c.metadata_ or {},
+                created_at=c.created_at,
+            )
+            for c in chunks
+        ],
     )

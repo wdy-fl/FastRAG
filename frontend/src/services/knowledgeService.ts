@@ -1,5 +1,5 @@
 import api from "./api";
-import type { KnowledgeBase, Document, IngestionTaskResponse, IngestionConfig } from "../types";
+import type { KnowledgeBase, Document, IngestionTaskResponse, IngestionConfig, ChunkListResponse } from "../types";
 
 const BASE = "/api/fastrag/knowledge-bases";
 
@@ -39,4 +39,14 @@ export const knowledgeService = {
     docId: string
   ): Promise<{ data: IngestionTaskResponse }> =>
     api.get(`${BASE}/${kbId}/documents/${docId}/ingestion-task`),
+
+  listChunks: (
+    kbId: string,
+    docId: string,
+    page: number = 1,
+    pageSize: number = 20,
+  ): Promise<{ data: ChunkListResponse }> =>
+    api.get(`${BASE}/${kbId}/documents/${docId}/chunks`, {
+      params: { page, page_size: pageSize },
+    }),
 };

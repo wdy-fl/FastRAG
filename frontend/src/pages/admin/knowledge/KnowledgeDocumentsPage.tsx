@@ -13,8 +13,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 
 import type { KnowledgeBase, Document } from "@/types";
 import { knowledgeService } from "@/services/knowledgeService";
-import { STATUS_COLORS, STATUS_LABELS, IN_PROGRESS_STATUSES } from "@/utils/documentStatus";
-import { IngestionTaskDetailDrawer } from "@/components/admin/IngestionTaskDetailDrawer";
+import { STATUS_COLORS, STATUS_LABELS } from "@/utils/documentStatus";
 
 const formatDate = (value?: string | null) => {
   if (!value) return "-";
@@ -31,7 +30,6 @@ export function KnowledgeDocumentsPage() {
   const [documents, setDocuments] = useState<Document[]>([]);
   const [loading, setLoading] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<Document | null>(null);
-  const [detailDoc, setDetailDoc] = useState<Document | null>(null);
 
   // Upload form state
   const [uploadFile, setUploadFile] = useState<File | null>(null);
@@ -220,7 +218,7 @@ export function KnowledgeDocumentsPage() {
                         <Button
                           size="sm"
                           variant="ghost"
-                          onClick={() => setDetailDoc(doc)}
+                          onClick={() => navigate(`/admin/knowledge/${kbId}/docs/${doc.id}`)}
                         >
                           详情
                         </Button>
@@ -265,16 +263,6 @@ export function KnowledgeDocumentsPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-
-      {detailDoc && (
-        <IngestionTaskDetailDrawer
-          kbId={kbId!}
-          docId={detailDoc.id}
-          filename={detailDoc.filename}
-          open={!!detailDoc}
-          onOpenChange={(v) => { if (!v) setDetailDoc(null); }}
-        />
-      )}
     </div>
   );
 }
