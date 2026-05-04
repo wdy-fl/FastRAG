@@ -1,5 +1,6 @@
 from __future__ import annotations
 from contextlib import asynccontextmanager
+from pathlib import Path
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from backend.api.deps import get_llm_provider, get_embedding_provider, get_redis_cache
@@ -8,6 +9,11 @@ from backend.api.routers import chat, conversation, knowledge, ingestion, intent
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    _tmp_dir = Path(__file__).parent / "temp"
+    if _tmp_dir.exists():
+        for f in _tmp_dir.iterdir():
+            if f.is_file():
+                f.unlink(missing_ok=True)
     yield
     # Graceful shutdown
     await get_llm_provider().close()
