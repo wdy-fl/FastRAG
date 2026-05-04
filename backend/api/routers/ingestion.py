@@ -104,7 +104,9 @@ async def trigger_ingestion(
         raise HTTPException(status_code=404, detail="Knowledge base not found")
 
     suffix = os.path.splitext(file.filename or "")[1]
-    fd, tmp_path = tempfile.mkstemp(suffix=suffix)
+    _TMP_DIR = os.path.join(os.path.dirname(__file__), "..", "..", "temp")
+    os.makedirs(_TMP_DIR, exist_ok=True)
+    fd, tmp_path = tempfile.mkstemp(suffix=suffix, dir=_TMP_DIR)
     try:
         content = await file.read()
         os.write(fd, content)
