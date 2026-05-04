@@ -75,8 +75,6 @@ export function RunsTable({
             <Table className="trace-list-table">
               <TableHeader>
                 <TableRow>
-                  <TableHead className="trace-col-run-id">Trace Id</TableHead>
-                  <TableHead className="trace-col-meta">会话ID</TableHead>
                   <TableHead>Query</TableHead>
                   <TableHead className="trace-col-duration">耗时</TableHead>
                   <TableHead className="trace-col-status">状态</TableHead>
@@ -87,16 +85,6 @@ export function RunsTable({
               <TableBody>
                 {runs.map((run) => (
                   <TableRow key={run.id} className="trace-list-table-row">
-                    <TableCell className="trace-col-run-id">
-                      <span className="trace-list-run-id" title={run.id}>
-                        {run.id}
-                      </span>
-                    </TableCell>
-                    <TableCell className="trace-col-meta">
-                      <p className="trace-list-run-meta-line" title={`会话ID: ${run.conversation_id || "-"}`}>
-                        {run.conversation_id || "-"}
-                      </p>
-                    </TableCell>
                     <TableCell>
                       <span className="line-clamp-2" title={run.query}>
                         {run.query}
