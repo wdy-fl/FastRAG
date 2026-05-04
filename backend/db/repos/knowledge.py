@@ -3,7 +3,7 @@ from uuid import uuid4
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from backend.db.models.knowledge import (
-    KnowledgeBaseORM, KnowledgeDocumentORM, KnowledgeChunkORM
+    KnowledgeBaseORM, KnowledgeDocumentORM, KnowledgeChunkORM, KnowledgeDocQuestionORM
 )
 
 
@@ -94,6 +94,23 @@ class KnowledgeRepo:
             delete(KnowledgeBaseORM).where(KnowledgeBaseORM.id == kb_id)
         )
         await self._session.commit()
+
+    async def delete_document(self, doc_id: str) -> bool:
+        from sqlalchemy import delete
+        doc = await self.get_document(doc_id)
+        if not doc:
+            return False
+        await self._session.execute(
+            delete(KnowledgeDocQuestionORM).where(KnowledgeDocQuestionORM.document_id == doc_id)
+        )
+        await self._session.execute(
+            delete(KnowledgeChunkORM).where(KnowledgeChunkORM.document_id == doc_id)
+        )
+        await self._session.execute(
+            delete(KnowledgeDocumentORM).where(KnowledgeDocumentORM.id == doc_id)
+        )
+        await self._session.commit()
+        return True
 
     async def list_documents(self, kb_id: str) -> list[KnowledgeDocumentORM]:
         result = await self._session.execute(

@@ -89,11 +89,16 @@ export function KnowledgeDocumentsPage() {
   const handleDelete = async () => {
     if (!deleteTarget || !kbId) return;
     try {
-      // deleteDocument not yet in service; show placeholder notice
-      toast.info("删除功能暂未开放");
+      await knowledgeService.deleteDocument(kbId, deleteTarget.id);
+      toast.success("文档已删除");
       setDeleteTarget(null);
-    } catch (error) {
-      toast.error("删除失败");
+      fetchDocuments();
+    } catch (error: any) {
+      if (error?.response?.status === 409) {
+        toast.error("文档正在处理中，请等待摄入完成后再删除");
+      } else {
+        toast.error("删除失败");
+      }
       console.error(error);
     }
   };

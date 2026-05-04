@@ -63,6 +63,13 @@ class IngestionTaskRepo:
             task.finished_at = datetime.now(timezone.utc)
             await self._session.commit()
 
+    async def delete_by_document(self, document_id: str) -> None:
+        from sqlalchemy import delete
+        await self._session.execute(
+            delete(IngestionTaskORM).where(IngestionTaskORM.document_id == document_id)
+        )
+        await self._session.commit()
+
     async def update_failed(self, task_id: str, error: str) -> None:
         task = await self.get(task_id)
         if task:

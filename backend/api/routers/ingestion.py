@@ -188,6 +188,28 @@ async def trigger_ingestion(
     return TriggerIngestionResponse(document_id=doc.id, task_id=task.id, status=doc.status)
 
 
+@router.delete(
+    "/knowledge-bases/{kb_id}/documents/{doc_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+)
+async def delete_document(
+    kb_id: str,
+    doc_id: str,
+    kb_repo: KnowledgeRepo = Depends(get_knowledge_repo),
+    task_repo: IngestionTaskRepo = Depends(get_ingestion_task_repo),
+) -> None:
+    doc = await kb_repo.get_document(doc_id)
+    if not doc or doc.knowledge_base_id != kb_id:
+        raise HTTPException(status_code=404, detail="Document not found")
+    if doc.status not in ("completed", "failed"):
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Document is still being processed, please wait until ingestion finishes",
+        )
+    await task_repo.delete_by_document(doc_id)
+    _ = await kb_repo.delete_document(doc_id)
+
+
 @router.get("/knowledge-bases/{kb_id}/documents")
 async def list_documents(
     kb_id: str,

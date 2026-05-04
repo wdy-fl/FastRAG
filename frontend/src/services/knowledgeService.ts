@@ -20,6 +20,9 @@ export const knowledgeService = {
   listDocuments: (kbId: string): Promise<{ data: Document[] }> =>
     api.get(`${BASE}/${kbId}/documents`),
 
+  deleteDocument: (kbId: string, docId: string): Promise<void> =>
+    api.delete(`${BASE}/${kbId}/documents/${docId}`),
+
   uploadDocument: (
     kbId: string,
     file: File
