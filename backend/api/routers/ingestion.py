@@ -141,48 +141,52 @@ async def trigger_ingestion(
     timeout = settings.ingestion.task_timeout_seconds
 
     async def _run() -> None:
-        async with session_factory() as session:
-            _doc_repo = KnowledgeRepo(session)
-            _task_repo = IngestionTaskRepo(session)
+        try:
+            async with session_factory() as session:
+                _doc_repo = KnowledgeRepo(session)
+                _task_repo = IngestionTaskRepo(session)
 
-            await _task_repo.update_started(task.id)
-            await _doc_repo.update_document_status(doc.id, status="fetching")
+                await _task_repo.update_started(task.id)
+                await _doc_repo.update_document_status(doc.id, status="fetching")
 
-            async def on_node_complete(node_name: str, result: NodeResult) -> None:
-                if result.status == "success":
-                    next_status = _NODE_TO_DOC_STATUS.get(node_name)
-                    if next_status:
-                        await _doc_repo.update_document_status(doc.id, status=next_status)
-                await _task_repo.append_node_result(
-                    task.id,
-                    node_name=node_name,
-                    status=result.status,
-                    duration_ms=result.duration_ms,
-                )
+                async def on_node_complete(node_name: str, result: NodeResult) -> None:
+                    if result.status == "success":
+                        next_status = _NODE_TO_DOC_STATUS.get(node_name)
+                        if next_status:
+                            await _doc_repo.update_document_status(doc.id, status=next_status)
+                    await _task_repo.append_node_result(
+                        task.id,
+                        node_name=node_name,
+                        status=result.status,
+                        duration_ms=result.duration_ms,
+                    )
 
-            try:
-                await asyncio.wait_for(
-                    engine.execute(config, context, on_node_complete=on_node_complete),
-                    timeout=timeout,
-                )
-                chunk_count = len(context.embedded_chunks)
-                await _doc_repo.update_document_status(
-                    doc.id, status="completed", chunk_count=chunk_count
-                )
-                await _task_repo.update_completed(task.id, chunk_count=chunk_count)
-            except asyncio.TimeoutError:
-                await _doc_repo.update_document_status(doc.id, status="failed",
-                                                        error_message="Ingestion timeout")
-                await _task_repo.update_failed(task.id, error="Ingestion timeout")
-            except Exception as exc:
-                await _doc_repo.update_document_status(doc.id, status="failed",
-                                                        error_message=str(exc))
-                await _task_repo.update_failed(task.id, error=str(exc))
-            finally:
                 try:
-                    os.unlink(tmp_path)
-                except OSError:
-                    pass
+                    await asyncio.wait_for(
+                        engine.execute(config, context, on_node_complete=on_node_complete),
+                        timeout=timeout,
+                    )
+                    chunk_count = len(context.embedded_chunks)
+                    await _doc_repo.update_document_status(
+                        doc.id, status="completed", chunk_count=chunk_count
+                    )
+                    await _task_repo.update_completed(task.id, chunk_count=chunk_count)
+                except asyncio.TimeoutError:
+                    await _doc_repo.update_document_status(doc.id, status="failed",
+                                                            error_message="Ingestion timeout")
+                    await _task_repo.update_failed(task.id, error="Ingestion timeout")
+                except Exception as exc:
+                    await _doc_repo.update_document_status(doc.id, status="failed",
+                                                            error_message=str(exc))
+                    await _task_repo.update_failed(task.id, error=str(exc))
+        except Exception as exc:
+            import logging
+            logging.getLogger(__name__).exception("Ingestion task %s failed before session: %s", task.id, exc)
+        finally:
+            try:
+                os.unlink(tmp_path)
+            except OSError:
+                pass
 
     asyncio.create_task(_run())
     return TriggerIngestionResponse(document_id=doc.id, task_id=task.id, status=doc.status)

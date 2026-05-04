@@ -42,7 +42,7 @@ class IngestionTaskRepo:
         task = await self.get(task_id)
         if task:
             task.status = "running"
-            task.started_at = datetime.now(timezone.utc)
+            task.started_at = datetime.now(timezone.utc).replace(tzinfo=None)
             await self._session.commit()
 
     async def append_node_result(
@@ -60,7 +60,7 @@ class IngestionTaskRepo:
         if task:
             task.status = "completed"
             task.chunk_count = chunk_count
-            task.finished_at = datetime.now(timezone.utc)
+            task.finished_at = datetime.now(timezone.utc).replace(tzinfo=None)
             await self._session.commit()
 
     async def delete_by_document(self, document_id: str) -> None:
@@ -75,5 +75,5 @@ class IngestionTaskRepo:
         if task:
             task.status = "failed"
             task.error_message = error
-            task.finished_at = datetime.now(timezone.utc)
+            task.finished_at = datetime.now(timezone.utc).replace(tzinfo=None)
             await self._session.commit()
