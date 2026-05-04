@@ -11,14 +11,8 @@ interface SessionListProps {
 
 export function SessionList({ onSelect }: SessionListProps) {
   const navigate = useNavigate();
-  const { sessions, currentSessionId, isLoading, fetchSessions, selectSession, deleteSession } =
+  const { sessions, currentSessionId, isLoading, selectSession, deleteSession } =
     useChatStore();
-
-  React.useEffect(() => {
-    if (sessions.length === 0) {
-      fetchSessions().catch(() => null);
-    }
-  }, [fetchSessions, sessions.length]);
 
   if (isLoading && sessions.length === 0) {
     return <Loading label="加载会话中" />;

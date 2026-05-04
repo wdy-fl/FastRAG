@@ -77,6 +77,8 @@ export const useChatStore = create<ChatState>((set, get) => ({
   cancelRequested: false,
 
   fetchSessions: async () => {
+    const { isLoading, sessionsLoaded } = get();
+    if (isLoading || sessionsLoaded) return;
     set({ isLoading: true });
     try {
       const res = await sessionService.list();
