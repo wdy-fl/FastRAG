@@ -5,7 +5,7 @@ from backend.core.rag.pipeline import RAGPipeline
 from backend.core.models.chat import (
     ChatRequest, ConversationHistory, LLMEvent, GuidanceEvent, RetrievedChunk,
 )
-from backend.core.models.intent import IntentResult
+from backend.core.models.intent import IntentNode, IntentResult
 from backend.infra.rerank.bailian import BailianRerankClient
 
 
@@ -23,6 +23,7 @@ def _make_pipeline(
     llm=None,
     retriever=None,
     reranker=None,
+    intent_classifier=None,
 ):
     if llm is not None:
         mock_llm = llm
@@ -46,10 +47,13 @@ def _make_pipeline(
     mock_rewriter.rewrite = AsyncMock(return_value="rewritten query")
     mock_rewriter.split = AsyncMock(return_value=["rewritten query"])
 
-    mock_intent = AsyncMock()
-    mock_intent.classify = AsyncMock(
-        return_value=IntentResult(needs_guidance=needs_guidance)
-    )
+    if intent_classifier is not None:
+        mock_intent = intent_classifier
+    else:
+        mock_intent = AsyncMock()
+        mock_intent.classify = AsyncMock(
+            return_value=IntentResult(needs_guidance=needs_guidance)
+        )
 
     if retriever is not None:
         mock_retriever = retriever
@@ -183,3 +187,26 @@ async def test_pipeline_skips_reranker_when_none():
 
     # 验证 pipeline 正常完成，不抛异常
     assert any(e.type == "done" for e in events if hasattr(e, "type"))
+
+
+@pytest.mark.asyncio
+async def test_pipeline_fast_path_on_system_intent():
+    """All sub-queries matched system intent → skip retrieval, direct LLM answer."""
+    system_node = IntentNode(id="s1", name="Chat", level="domain", intent_type="system")
+    mock_intent = AsyncMock()
+    mock_intent.classify = AsyncMock(
+        return_value=IntentResult(matched_node=system_node, confidence=0.9)
+    )
+
+    mock_retriever = AsyncMock()
+    mock_retriever.retrieve = AsyncMock(return_value=[])
+
+    pipeline = _make_pipeline(intent_classifier=mock_intent, retriever=mock_retriever)
+    request = ChatRequest(query="你好", conversation_id="conv-1")
+
+    events = [e async for e in pipeline.chat(request)]
+
+    # Should have LLM content events
+    assert any(isinstance(e, LLMEvent) and e.type == "content" for e in events)
+    # Should NOT call retrieval
+    mock_retriever.retrieve.assert_not_awaited()

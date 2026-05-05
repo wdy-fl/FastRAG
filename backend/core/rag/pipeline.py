@@ -62,6 +62,30 @@ class RAGPipeline:
                     yield GuidanceEvent(intent=intent)
                     return
 
+            # SYSTEM fast-path: all sub-queries matched system intent → skip retrieval
+            if all(
+                ir.matched_node and ir.matched_node.intent_type == "system"
+                for ir in intents
+            ):
+                prompt = self._prompt_builder.build(
+                    request.query, history, [], list(intents)
+                )
+                extra_kwargs: dict[str, Any] = {}
+                if request.deep_thinking:
+                    extra_kwargs["extra_body"] = {"enable_thinking": True}
+                async for event in self._llm.stream(prompt, **extra_kwargs):
+                    if event.type == "content":
+                        answer_parts.append(event.content)
+                    yield event
+                await self._memory.save(
+                    request.conversation_id,
+                    query=request.query,
+                    answer="".join(answer_parts),
+                )
+                total_ms = int((time.monotonic() - start) * 1000)
+                await self._tracer.finish_run(status="success", total_duration_ms=total_ms)
+                return
+
             retrieved = await self._tracer.trace_node("retrieval")(
                 self._retriever.retrieve
             )(sub_queries, intents)
