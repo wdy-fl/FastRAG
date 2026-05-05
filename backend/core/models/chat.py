@@ -49,4 +49,17 @@ class RetrievedChunk(BaseModel):
     document_id: str | None = None
 
 
-ChatEvent = Union[MetaEvent, LLMEvent, GuidanceEvent]
+class SourceItem(BaseModel):
+    ref: int
+    document_id: str | None = None
+    document_name: str | None = None
+    score: float
+    content: str
+
+
+class SourcesEvent(BaseModel):
+    type: Literal["sources"] = "sources"
+    sources: list[SourceItem]
+
+
+ChatEvent = Union[MetaEvent, LLMEvent, GuidanceEvent, SourcesEvent]
