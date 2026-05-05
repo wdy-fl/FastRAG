@@ -8,7 +8,7 @@ from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 from backend.api.deps import get_rag_pipeline, get_llm_provider, get_conversation_repo, get_redis_cache
 from backend.infra.cache.redis import RedisCache
-from backend.core.models.chat import ChatRequest, LLMEvent, GuidanceEvent, MetaEvent
+from backend.core.models.chat import ChatRequest, LLMEvent, GuidanceEvent, MetaEvent, SourcesEvent
 from backend.core.rag.pipeline import RAGPipeline
 from backend.db.repos.conversation import ConversationRepo
 from backend.infra.llm.client import OpenAICompatClient
@@ -35,7 +35,9 @@ async def _event_stream(
 
     # 2. 流式返回 pipeline 事件
     async for event in pipeline.chat(request):
-        if isinstance(event, LLMEvent):
+        if isinstance(event, SourcesEvent):
+            payload = event.model_dump(ensure_ascii=False)
+        elif isinstance(event, LLMEvent):
             if event.type == "done":
                 continue  # done 在最后统一发送
             payload = {"type": event.type, "content": event.content}

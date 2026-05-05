@@ -129,6 +129,7 @@ def get_rag_pipeline(
     trace_repo: TraceRepo = Depends(get_trace_repo),
     intent_repo: IntentRepo = Depends(get_intent_repo),
     mapping_repo: MappingRepo = Depends(get_mapping_repo),
+    knowledge_repo: KnowledgeRepo = Depends(get_knowledge_repo),
 ) -> RAGPipeline:
     s = get_settings()
     llm = get_llm_provider()
@@ -160,6 +161,7 @@ def get_rag_pipeline(
         ),
         prompt_builder=PromptBuilder(),
         tracer=RagTracer(repo=trace_repo),
+        doc_repo=knowledge_repo,
         reranker=get_reranker(),
         term_mapper=QueryTermMapper(
             mapping_repo=mapping_repo,
