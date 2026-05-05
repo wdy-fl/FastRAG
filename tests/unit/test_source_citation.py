@@ -96,3 +96,116 @@ async def test_batch_get_names_empty_input():
 
     assert result == {}
     mock_session.execute.assert_not_awaited()
+
+
+# ---------------------------------------------------------------------------
+# Task 4: RAGPipeline yields SourcesEvent
+# ---------------------------------------------------------------------------
+from backend.core.models.chat import ChatRequest, RetrievedChunk, ConversationHistory
+from backend.core.rag.pipeline import RAGPipeline
+
+
+def _make_pipeline(doc_name_map: dict[str, str] | None = None) -> RAGPipeline:
+    """Build a minimal RAGPipeline with mocked deps for sources testing."""
+    mock_llm = AsyncMock()
+    mock_memory = AsyncMock()
+    mock_rewriter = AsyncMock()
+    mock_intent_classifier = AsyncMock()
+    mock_retriever = AsyncMock()
+    mock_prompt_builder = AsyncMock()
+    mock_tracer = AsyncMock()
+    mock_doc_repo = AsyncMock()
+
+    mock_retriever.retrieve = AsyncMock(return_value=[])
+    mock_memory.load = AsyncMock(return_value=ConversationHistory())
+    mock_rewriter.rewrite = AsyncMock(return_value="rewritten")
+    mock_rewriter.split = AsyncMock(return_value=["sub-q"])
+    mock_intent_classifier.classify = AsyncMock(
+        return_value=MagicMock(needs_guidance=False, matched_node=None)
+    )
+    mock_prompt_builder.build = MagicMock(return_value=[{"role": "user", "content": "q"}])
+    mock_tracer.start_run = AsyncMock()
+    mock_tracer.finish_run = AsyncMock()
+    mock_tracer.trace_node = lambda name: (lambda fn: fn)  # passthrough
+
+    if doc_name_map is not None:
+        mock_doc_repo.batch_get_names = AsyncMock(return_value=doc_name_map)
+
+    return RAGPipeline(
+        llm=mock_llm,
+        memory=mock_memory,
+        rewriter=mock_rewriter,
+        intent_classifier=mock_intent_classifier,
+        retriever=mock_retriever,
+        prompt_builder=mock_prompt_builder,
+        tracer=mock_tracer,
+        doc_repo=mock_doc_repo,
+    )
+
+
+@pytest.mark.asyncio
+async def test_pipeline_yields_sources_event_with_retrieved_chunks():
+    pipeline = _make_pipeline(doc_name_map={"doc-1": "员工手册.pdf"})
+
+    pipeline._retriever.retrieve = AsyncMock(return_value=[
+        RetrievedChunk(content="年假5天", score=0.9, document_id="doc-1"),
+    ])
+
+    async def fake_stream(messages, **kwargs):
+        from backend.core.models.chat import LLMEvent
+        yield LLMEvent(type="content", content="年假5天[1]")
+        yield LLMEvent(type="done", content="")
+    pipeline._llm.stream = fake_stream
+
+    events = []
+    async for event in pipeline.chat(ChatRequest(query="年假几天?", conversation_id="c1")):
+        events.append(event)
+
+    sources_events = [e for e in events if isinstance(e, SourcesEvent)]
+    assert len(sources_events) == 1
+    assert sources_events[0].sources[0].ref == 1
+    assert sources_events[0].sources[0].document_name == "员工手册.pdf"
+    assert sources_events[0].sources[0].score == 0.9
+
+
+@pytest.mark.asyncio
+async def test_pipeline_yields_empty_sources_when_no_retrieval():
+    pipeline = _make_pipeline(doc_name_map={})
+
+    pipeline._retriever.retrieve = AsyncMock(return_value=[])
+
+    async def fake_stream(messages, **kwargs):
+        from backend.core.models.chat import LLMEvent
+        yield LLMEvent(type="content", content="未检索到相关信息")
+        yield LLMEvent(type="done", content="")
+    pipeline._llm.stream = fake_stream
+
+    events = []
+    async for event in pipeline.chat(ChatRequest(query="???", conversation_id="c1")):
+        events.append(event)
+
+    sources_events = [e for e in events if isinstance(e, SourcesEvent)]
+    assert len(sources_events) == 1
+    assert sources_events[0].sources == []
+
+
+@pytest.mark.asyncio
+async def test_pipeline_sources_event_comes_before_llm_content():
+    pipeline = _make_pipeline(doc_name_map={"doc-1": "a.pdf"})
+
+    pipeline._retriever.retrieve = AsyncMock(return_value=[
+        RetrievedChunk(content="x", score=0.8, document_id="doc-1"),
+    ])
+
+    async def fake_stream(messages, **kwargs):
+        from backend.core.models.chat import LLMEvent
+        yield LLMEvent(type="content", content="answer")
+        yield LLMEvent(type="done", content="")
+    pipeline._llm.stream = fake_stream
+
+    events = []
+    async for event in pipeline.chat(ChatRequest(query="q", conversation_id="c1")):
+        events.append(event)
+
+    types = [e.type if hasattr(e, 'type') else None for e in events]
+    assert types.index("sources") < types.index("content")

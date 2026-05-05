@@ -2,7 +2,7 @@ from __future__ import annotations
 import asyncio
 import time
 from typing import Any, AsyncIterator
-from backend.core.models.chat import ChatEvent, ChatRequest, GuidanceEvent, LLMEvent
+from backend.core.models.chat import ChatEvent, ChatRequest, GuidanceEvent, LLMEvent, SourceItem, SourcesEvent
 from backend.core.rag.memory import SlidingWindowMemory
 from backend.core.rag.rewrite import LLMQueryRewriter
 from backend.core.rag.intent import LLMIntentClassifier
@@ -26,6 +26,7 @@ class RAGPipeline:
         tracer: RagTracer,
         reranker: BailianRerankClient | None = None,
         term_mapper: QueryTermMapper | None = None,
+        doc_repo: Any = None,
     ) -> None:
         self._llm = llm
         self._memory = memory
@@ -36,6 +37,7 @@ class RAGPipeline:
         self._tracer = tracer
         self._reranker = reranker
         self._term_mapper = term_mapper
+        self._doc_repo = doc_repo
 
     async def chat(self, request: ChatRequest) -> AsyncIterator[ChatEvent]:
         start = time.monotonic()
@@ -80,6 +82,7 @@ class RAGPipeline:
                 prompt = self._prompt_builder.build(
                     request.query, history, [], list(intents)
                 )
+                yield SourcesEvent(sources=[])
                 extra_kwargs: dict[str, Any] = {}
                 if request.deep_thinking:
                     extra_kwargs["extra_body"] = {"enable_thinking": True}
@@ -102,6 +105,21 @@ class RAGPipeline:
 
             if self._reranker is not None:
                 retrieved = await self._reranker.rerank(request.query, retrieved)
+
+            # Assemble and yield sources event
+            doc_ids = list({c.document_id for c in retrieved if c.document_id})
+            doc_name_map = await self._doc_repo.batch_get_names(doc_ids) if doc_ids else {}
+            source_items = [
+                SourceItem(
+                    ref=i + 1,
+                    document_id=c.document_id,
+                    document_name=doc_name_map.get(c.document_id),
+                    score=c.score,
+                    content=c.content,
+                )
+                for i, c in enumerate(retrieved)
+            ]
+            yield SourcesEvent(sources=source_items)
 
             prompt = self._prompt_builder.build(
                 request.query, history, retrieved, list(intents)
