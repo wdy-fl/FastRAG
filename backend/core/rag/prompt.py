@@ -4,7 +4,10 @@ from backend.core.models.intent import IntentResult
 
 _DEFAULT_SYSTEM = (
     "You are a helpful assistant. Answer the user's question based on the provided context. "
-    "If the context does not contain relevant information, say so honestly."
+    "If the context does not contain relevant information, say so honestly.\n\n"
+    "When you use information from a specific context fragment, cite it using the bracket number, "
+    "e.g. [1], [2]. Place the citation immediately after the statement it supports. "
+    "You may cite multiple sources for a single statement, e.g. [1][2]."
 )
 
 

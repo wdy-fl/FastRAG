@@ -40,3 +40,25 @@ def test_sources_event_in_chat_event_union():
     """SourcesEvent must be part of ChatEvent union so isinstance checks work."""
     event = SourcesEvent(sources=[])
     assert isinstance(event, ChatEvent.__args__[-1])  # last type added to union
+
+
+from backend.core.rag.prompt import PromptBuilder, _DEFAULT_SYSTEM
+from backend.core.models.chat import ConversationHistory, RetrievedChunk
+
+
+def test_default_prompt_contains_citation_instruction():
+    assert "[1]" in _DEFAULT_SYSTEM or "bracket number" in _DEFAULT_SYSTEM.lower()
+
+
+def test_prompt_builder_includes_citation_instruction():
+    builder = PromptBuilder()
+    messages = builder.build(
+        query="test?",
+        history=ConversationHistory(),
+        retrieved=[
+            RetrievedChunk(content="chunk1", score=0.9, document_id="d1"),
+        ],
+        intents=[],
+    )
+    system_msg = messages[0]["content"]
+    assert "bracket number" in system_msg.lower() or "[1]" in system_msg
