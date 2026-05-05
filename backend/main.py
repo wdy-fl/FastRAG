@@ -5,10 +5,15 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from backend.api.deps import get_llm_provider, get_embedding_provider, get_redis_cache
 from backend.api.routers import chat, conversation, knowledge, ingestion, intent, trace, mapping
+from backend.config.logging import configure_logging
+from backend.config.settings import Settings
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    # Configure logging after uvicorn has finished its own log setup
+    configure_logging(level=Settings().log_level)
+
     _tmp_dir = Path(__file__).parent / "temp"
     if _tmp_dir.exists():
         for f in _tmp_dir.iterdir():

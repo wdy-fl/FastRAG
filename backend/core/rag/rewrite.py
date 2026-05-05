@@ -1,6 +1,9 @@
 from __future__ import annotations
+import logging
 from backend.core.models.chat import ConversationHistory
 from backend.core.rag.protocols import LLMProvider
+
+logger = logging.getLogger("backend.rag.rewrite")
 
 _REWRITE_PROMPT = (
     "You are a query optimizer. Given the conversation history and the current query, "
@@ -25,16 +28,20 @@ class LLMQueryRewriter:
             f"{m.role}: {m.content}" for m in history.messages[-4:]
         )
         prompt = _REWRITE_PROMPT.format(history=history_text or "none", query=query)
+        logger.debug("查询改写 | query=%r | history_lines=%d", query, len(history.messages[-4:]))
         parts: list[str] = []
         async for event in self._llm.stream(
             [{"role": "user", "content": prompt}]
         ):
             if event.type == "content":
                 parts.append(event.content)
-        return "".join(parts).strip() or query
+        result = "".join(parts).strip() or query
+        logger.info("查询改写完成 | %r → %r", query, result)
+        return result
 
     async def split(self, query: str) -> list[str]:
         prompt = _SPLIT_PROMPT.format(query=query)
+        logger.debug("查询拆分 | query=%r", query)
         parts: list[str] = []
         async for event in self._llm.stream(
             [{"role": "user", "content": prompt}]
@@ -47,4 +54,6 @@ class LLMQueryRewriter:
             for line in raw.splitlines()
             if line.strip()
         ]
-        return [q for q in lines if q] or [query]
+        result = [q for q in lines if q] or [query]
+        logger.info("查询拆分完成 | count=%d | sub_queries=%s", len(result), result)
+        return result

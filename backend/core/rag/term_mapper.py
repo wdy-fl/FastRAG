@@ -1,8 +1,11 @@
 from __future__ import annotations
 import json
+import logging
 import re
 from backend.core.models.mapping import QueryTermMapping
 from backend.infra.cache.redis import RedisCache
+
+logger = logging.getLogger("backend.rag.term_mapper")
 
 
 class QueryTermMapper:
@@ -52,8 +55,16 @@ class QueryTermMapper:
     async def expand(self, query: str, kb_id: str | None = None) -> str:
         mappings = await self._load_mappings()
         result = query
+        applied = []
         for m in mappings:
             if m.knowledge_base_id is None or m.knowledge_base_id == kb_id:
                 pattern = r'\b' + re.escape(m.source_term) + r'\b'
-                result = re.sub(pattern, m.target_term, result)
+                new_result = re.sub(pattern, m.target_term, result)
+                if new_result != result:
+                    applied.append(f"{m.source_term}→{m.target_term}")
+                    result = new_result
+        if applied:
+            logger.info("术语映射 | 命中=%d | mappings=%s | %r → %r", len(applied), applied, query, result)
+        else:
+            logger.debug("术语映射 | 无命中 | query=%r", query)
         return result

@@ -1,8 +1,11 @@
 from __future__ import annotations
 import json
+import logging
 from backend.core.models.intent import IntentNode, IntentResult
 from backend.core.rag.protocols import LLMProvider
 from backend.infra.cache.redis import RedisCache
+
+logger = logging.getLogger("backend.rag.intent")
 
 _CLASSIFY_PROMPT = (
     "You are an intent classifier. Given the following user query and the available intent nodes, "
@@ -65,6 +68,7 @@ class LLMIntentClassifier:
     async def classify(self, query: str) -> IntentResult:
         nodes = await self._load_nodes()
         if not nodes:
+            logger.info("意图分类 | 无意图节点配置，跳过分类 | query=%r", query)
             return IntentResult(needs_guidance=False, confidence=1.0)
 
         nodes_text = "\n".join(
@@ -79,9 +83,11 @@ class LLMIntentClassifier:
             if event.type == "content":
                 parts.append(event.content)
         raw = "".join(parts).strip()
+        logger.debug("意图分类 | LLM原始响应 | %s", raw)
         try:
             data = json.loads(raw)
         except (json.JSONDecodeError, ValueError):
+            logger.warning("意图分类 | JSON解析失败 | raw=%s", raw[:200])
             return IntentResult(needs_guidance=True, guidance_message="Intent classification failed.")
 
         confidence = float(data.get("confidence", 0.0))
@@ -90,6 +96,10 @@ class LLMIntentClassifier:
         matched_node = nodes_by_id.get(matched_id) if matched_id else None
 
         if confidence < self._threshold:
+            logger.info(
+                "意图分类 | 低置信度 → 引导 | query=%r | confidence=%.2f < threshold=%.2f | matched_id=%s",
+                query, confidence, self._threshold, matched_id,
+            )
             return IntentResult(
                 confidence=confidence,
                 needs_guidance=True,
@@ -97,6 +107,13 @@ class LLMIntentClassifier:
                 candidates=list(nodes[:3]),
             )
 
+        logger.info(
+            "意图分类 | 命中 | query=%r | confidence=%.2f | matched=%s (type=%s, kb=%s)",
+            query, confidence,
+            matched_node.name if matched_node else None,
+            matched_node.intent_type if matched_node else None,
+            matched_node.knowledge_base_id if matched_node else None,
+        )
         return IntentResult(
             matched_node=matched_node,
             confidence=confidence,

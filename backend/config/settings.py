@@ -28,6 +28,7 @@ class RerankSettings(BaseModel):
 class Settings(BaseSettings):
     database_url: str = "postgresql+asyncpg://postgres:postgres@localhost:5432/fastrag"
     redis_url: str = "redis://localhost:6379/0"
+    log_level: str = "INFO"
     llm: LLMSettings = LLMSettings()
     embedding: EmbeddingSettings = EmbeddingSettings()
     ingestion: IngestionSettings = IngestionSettings()

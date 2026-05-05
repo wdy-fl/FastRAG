@@ -1,11 +1,14 @@
 from __future__ import annotations
 import json
+import logging
 from typing import AsyncIterator
 
 import httpx
 
 from backend.core.models.chat import LLMEvent
 from backend.infra.llm.stream import parse_sse_line
+
+logger = logging.getLogger("backend.rag.llm")
 
 
 class OpenAICompatClient:
@@ -33,13 +36,16 @@ class OpenAICompatClient:
     async def stream(
         self, messages: list[dict], **kwargs
     ) -> AsyncIterator[LLMEvent]:
+        model = kwargs.pop("model", self.model)
         url = f"{self.base_url}/chat/completions"
         payload = {
-            "model": kwargs.pop("model", self.model),
+            "model": model,
             "messages": messages,
             "stream": True,
             **kwargs,
         }
+        logger.debug("LLM stream | model=%s | messages=%d", model, len(messages))
+        chunk_count = 0
         async with self._http.stream(
             "POST", url, json=payload, headers=self._auth_headers()
         ) as response:
@@ -47,18 +53,23 @@ class OpenAICompatClient:
             async for line in response.aiter_lines():
                 event = parse_sse_line(line)
                 if event is not None:
+                    chunk_count += 1
                     yield event
+        logger.info("LLM stream完成 | model=%s | chunks=%d", model, chunk_count)
 
     async def embed(
         self, texts: list[str], model: str | None = None
     ) -> list[list[float]]:
         url = f"{self.base_url}/embeddings"
         payload = {"model": model or self.model, "input": texts}
+        logger.debug("LLM embed | model=%s | texts=%d", model or self.model, len(texts))
         resp = await self._http.post(
             url, json=payload, headers=self._auth_headers()
         )
         resp.raise_for_status()
-        return [item["embedding"] for item in resp.json()["data"]]
+        result = [item["embedding"] for item in resp.json()["data"]]
+        logger.info("LLM embed完成 | model=%s | dim=%d", model or self.model, len(result[0]) if result else 0)
+        return result
 
     async def chat(
         self, messages: list[dict], model: str | None = None, **kwargs

@@ -1,9 +1,12 @@
 from __future__ import annotations
 import asyncio
+import logging
 from typing import Protocol
 from backend.core.models.chat import RetrievedChunk
 from backend.core.models.intent import IntentResult
 from backend.core.rag.protocols import LLMProvider, VectorStore
+
+logger = logging.getLogger("backend.rag.retrieve")
 
 
 class SearchChannel(Protocol):
@@ -31,11 +34,13 @@ class VectorSearchChannel:
             if intent.matched_node.intent_type == "kb" and intent.matched_node.knowledge_base_id:
                 kb_id = intent.matched_node.knowledge_base_id
 
-        return await self._store.search(
+        results = await self._store.search(
             query_vector=query_vector,
             top_k=top_k,
             knowledge_base_id=kb_id,
         )
+        logger.debug("VectorSearch | query=%r | kb=%s | top_k=%d | returned=%d", query, kb_id, top_k, len(results))
+        return results
 
 
 class QuestionSearchChannel:
@@ -56,11 +61,13 @@ class QuestionSearchChannel:
             if intent.matched_node.intent_type == "kb" and intent.matched_node.knowledge_base_id:
                 kb_id = intent.matched_node.knowledge_base_id
 
-        return await self._store.search_questions(
+        results = await self._store.search_questions(
             query_vector=query_vector,
             top_k=top_k,
             knowledge_base_id=kb_id,
         )
+        logger.debug("QuestionSearch | query=%r | kb=%s | top_k=%d | returned=%d", query, kb_id, top_k, len(results))
+        return results
 
 
 class RrfProcessor:
@@ -78,7 +85,14 @@ class RrfProcessor:
                 if key not in best_chunk or chunk.score > best_chunk[key].score:
                     best_chunk[key] = chunk
         sorted_keys = sorted(scores, key=lambda k: scores[k], reverse=True)
-        return [best_chunk[k] for k in sorted_keys]
+        fused = [best_chunk[k] for k in sorted_keys]
+        logger.info(
+            "RRF融合 | input_channels=%d | unique_chunks_before=%d | fused=%d",
+            len(channel_results),
+            sum(len(r) for r in channel_results),
+            len(fused),
+        )
+        return fused
 
 
 class MultiChannelRetriever:
@@ -94,12 +108,17 @@ class MultiChannelRetriever:
     async def retrieve(
         self, queries: list[str], intents: list[IntentResult]
     ) -> list[RetrievedChunk]:
+        logger.info(
+            "多通道检索开始 | queries=%s | channels=%d",
+            queries, len(self._channels),
+        )
         query_vectors: dict[str, list[float]] = {}
         if self._llm is not None:
             embeddings = await asyncio.gather(
                 *[self._llm.embed([q]) for q in queries]
             )
             query_vectors = {q: v[0] for q, v in zip(queries, embeddings)}
+            logger.debug("Embedding计算完成 | queries=%d", len(queries))
 
         tasks = [
             channel.search(
@@ -110,4 +129,17 @@ class MultiChannelRetriever:
             for channel in self._channels
         ]
         channel_results: list[list[RetrievedChunk]] = await asyncio.gather(*tasks)
+        # Log per-channel results
+        channel_names = [
+            type(ch).__name__ for ch in self._channels
+        ]
+        idx = 0
+        for qi, (query, intent) in enumerate(zip(queries, intents)):
+            for ci, ch_name in enumerate(channel_names):
+                count = len(channel_results[idx])
+                logger.debug(
+                    "  子查询[%d] 通道[%s] | query=%r | results=%d",
+                    qi, ch_name, query, count,
+                )
+                idx += 1
         return await self._rrf.process(channel_results)

@@ -1,6 +1,9 @@
 from __future__ import annotations
+import logging
 from backend.core.models.chat import ConversationHistory, RetrievedChunk
 from backend.core.models.intent import IntentResult
+
+logger = logging.getLogger("backend.rag.prompt")
 
 _DEFAULT_SYSTEM = (
     "You are a helpful assistant. Answer the user's question based on the provided context. "
@@ -43,4 +46,9 @@ class PromptBuilder:
             })
 
         messages.append({"role": "user", "content": query})
+        logger.info(
+            "构建Prompt | messages=%d | history=%d | chunks=%d | has_summary=%s",
+            len(messages), len(history.messages), len(retrieved),
+            "是" if history.summary else "否",
+        )
         return messages
