@@ -6,7 +6,8 @@ from typing import AsyncIterator
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
-from backend.api.deps import get_rag_pipeline, get_llm_provider, get_conversation_repo
+from backend.api.deps import get_rag_pipeline, get_llm_provider, get_conversation_repo, get_redis_cache
+from backend.infra.cache.redis import RedisCache
 from backend.core.models.chat import ChatRequest, LLMEvent, GuidanceEvent, MetaEvent
 from backend.core.rag.pipeline import RAGPipeline
 from backend.db.repos.conversation import ConversationRepo
@@ -83,10 +84,15 @@ async def chat_stream(
     pipeline: RAGPipeline = Depends(get_rag_pipeline),
     llm: OpenAICompatClient = Depends(get_llm_provider),
     repo: ConversationRepo = Depends(get_conversation_repo),
+    cache: RedisCache = Depends(get_redis_cache),
 ) -> StreamingResponse:
     task_id = str(uuid.uuid4())
 
     async def _managed_stream():
+        lock_key = f"chat:lock:{request.conversation_id}"
+        if not await cache.set_nx(lock_key, "1", ttl=30):
+            raise HTTPException(status_code=429, detail="请等待当前对话完成")
+
         _task_registry[task_id] = asyncio.current_task()
         try:
             async for chunk in _event_stream(request, pipeline, task_id, llm, repo):
@@ -95,6 +101,7 @@ async def chat_stream(
             pass
         finally:
             _task_registry.pop(task_id, None)
+            await cache.delete(lock_key)
 
     return StreamingResponse(
         _managed_stream(),
