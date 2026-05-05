@@ -11,18 +11,22 @@ class KeywordSearchChannel:
         self._session_factory = session_factory
 
     async def search(
-        self, query: str, intent: IntentResult, top_k: int = 10
+        self, query: str, intent: IntentResult, top_k: int = 10,
+        query_vector: list[float] | None = None,
     ) -> list[RetrievedChunk]:
-        knowledge_base_id = intent.matched_node.id if intent.matched_node else None
+        kb_id = None
+        if intent.matched_node:
+            if intent.matched_node.intent_type == "kb" and intent.matched_node.knowledge_base_id:
+                kb_id = intent.matched_node.knowledge_base_id
+
         async with self._session_factory() as session:
             tsquery = func.plainto_tsquery('simple', query)
             rank_col = func.ts_rank(KnowledgeChunkORM.keywords_tsv, tsquery).label("rank")
-            # 先构建所有 where 条件，最后再 limit，确保在正确范围内取 top_k
             stmt = select(KnowledgeChunkORM, rank_col).where(
                 KnowledgeChunkORM.keywords_tsv.op("@@")(tsquery)
             )
-            if knowledge_base_id is not None:
-                stmt = stmt.where(KnowledgeChunkORM.knowledge_base_id == knowledge_base_id)
+            if kb_id is not None:
+                stmt = stmt.where(KnowledgeChunkORM.knowledge_base_id == kb_id)
             stmt = stmt.order_by(rank_col.desc()).limit(top_k)
             result = await session.execute(stmt)
             return [

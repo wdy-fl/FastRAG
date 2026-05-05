@@ -8,7 +8,8 @@ from backend.core.rag.protocols import LLMProvider, VectorStore
 
 class SearchChannel(Protocol):
     async def search(
-        self, query: str, intent: IntentResult, top_k: int
+        self, query: str, intent: IntentResult, top_k: int,
+        query_vector: list[float],
     ) -> list[RetrievedChunk]: ...
 
 
@@ -18,14 +19,22 @@ class VectorSearchChannel:
         self._llm = llm
 
     async def search(
-        self, query: str, intent: IntentResult, top_k: int = 10
+        self, query: str, intent: IntentResult, top_k: int = 10,
+        query_vector: list[float] | None = None,
     ) -> list[RetrievedChunk]:
-        knowledge_base_id = intent.matched_node.id if intent.matched_node else None
-        vectors = await self._llm.embed([query])
+        if query_vector is None:
+            vectors = await self._llm.embed([query])
+            query_vector = vectors[0]
+
+        kb_id = None
+        if intent.matched_node:
+            if intent.matched_node.intent_type == "kb" and intent.matched_node.knowledge_base_id:
+                kb_id = intent.matched_node.knowledge_base_id
+
         return await self._store.search(
-            query_vector=vectors[0],
+            query_vector=query_vector,
             top_k=top_k,
-            knowledge_base_id=knowledge_base_id,
+            knowledge_base_id=kb_id,
         )
 
 
@@ -35,14 +44,22 @@ class QuestionSearchChannel:
         self._llm = llm
 
     async def search(
-        self, query: str, intent: IntentResult, top_k: int = 10
+        self, query: str, intent: IntentResult, top_k: int = 10,
+        query_vector: list[float] | None = None,
     ) -> list[RetrievedChunk]:
-        knowledge_base_id = intent.matched_node.id if intent.matched_node else None
-        vectors = await self._llm.embed([query])
+        if query_vector is None:
+            vectors = await self._llm.embed([query])
+            query_vector = vectors[0]
+
+        kb_id = None
+        if intent.matched_node:
+            if intent.matched_node.intent_type == "kb" and intent.matched_node.knowledge_base_id:
+                kb_id = intent.matched_node.knowledge_base_id
+
         return await self._store.search_questions(
-            query_vector=vectors[0],
+            query_vector=query_vector,
             top_k=top_k,
-            knowledge_base_id=knowledge_base_id,
+            knowledge_base_id=kb_id,
         )
 
 
@@ -68,15 +85,27 @@ class MultiChannelRetriever:
     def __init__(
         self,
         channels: list[SearchChannel],
+        llm: LLMProvider | None = None,
     ) -> None:
         self._channels = channels
+        self._llm = llm
         self._rrf = RrfProcessor()
 
     async def retrieve(
         self, queries: list[str], intents: list[IntentResult]
     ) -> list[RetrievedChunk]:
+        query_vectors: dict[str, list[float]] = {}
+        if self._llm is not None:
+            embeddings = await asyncio.gather(
+                *[self._llm.embed([q]) for q in queries]
+            )
+            query_vectors = {q: v[0] for q, v in zip(queries, embeddings)}
+
         tasks = [
-            channel.search(query, intent, top_k=10)
+            channel.search(
+                query, intent, top_k=10,
+                query_vector=query_vectors.get(query),
+            )
             for query, intent in zip(queries, intents)
             for channel in self._channels
         ]

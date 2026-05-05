@@ -77,7 +77,7 @@ async def test_vector_channel_searches_store():
     mock_llm.embed = AsyncMock(return_value=[[0.1] * 10])
 
     channel = VectorSearchChannel(vector_store=mock_store, llm=mock_llm)
-    results = await channel.search("query", IntentResult(), top_k=5)
+    results = await channel.search("query", IntentResult(), top_k=5, query_vector=[0.1] * 10)
 
     assert len(results) == 1
     assert results[0].content == "result"
@@ -109,7 +109,7 @@ async def test_question_channel_calls_search_questions():
     mock_llm.embed = AsyncMock(return_value=[[0.1] * 10])
 
     channel = QuestionSearchChannel(vector_store=mock_store, llm=mock_llm)
-    results = await channel.search("退款多久？", IntentResult(), top_k=5)
+    results = await channel.search("退款多久？", IntentResult(), top_k=5, query_vector=[0.1] * 10)
 
     mock_store.search_questions.assert_awaited_once()
     assert len(results) == 1
@@ -128,7 +128,7 @@ async def test_keyword_channel_searches_by_tsquery():
     mock_session.execute = AsyncMock(return_value=mock_result)
 
     channel = KeywordSearchChannel(session_factory=mock_session_factory)
-    results = await channel.search("退款政策", IntentResult(), top_k=5)
+    results = await channel.search("退款政策", IntentResult(), top_k=5, query_vector=[0.1] * 10)
 
     mock_session.execute.assert_awaited_once()
     assert isinstance(results, list)
@@ -161,7 +161,7 @@ async def test_multi_channel_retriever_uses_rrf():
     mock_channel.search = AsyncMock(
         return_value=[RetrievedChunk(content="result", score=0.9, document_id="d1")]
     )
-    retriever = MultiChannelRetriever(channels=[mock_channel])
+    retriever = MultiChannelRetriever(channels=[mock_channel], llm=None)
     results = await retriever.retrieve(["query"], [IntentResult()])
 
     assert len(results) == 1
@@ -242,3 +242,56 @@ async def test_classifier_reads_from_redis_cache():
     assert len(nodes) == 1
     assert nodes[0].id == "n1"
     mock_repo.list_intent_nodes.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_vector_channel_uses_provided_query_vector():
+    mock_store = AsyncMock()
+    mock_store.search = AsyncMock(return_value=[])
+    channel = VectorSearchChannel(vector_store=mock_store, llm=AsyncMock())
+    vec = [0.1] * 10
+    await channel.search("query", IntentResult(), top_k=5, query_vector=vec)
+    mock_store.search.assert_awaited_once_with(
+        query_vector=vec, top_k=5, knowledge_base_id=None,
+    )
+
+
+@pytest.mark.asyncio
+async def test_vector_channel_routes_to_specific_kb():
+    mock_store = AsyncMock()
+    mock_store.search = AsyncMock(return_value=[])
+    channel = VectorSearchChannel(vector_store=mock_store, llm=AsyncMock())
+    node = IntentNode(id="n1", name="Finance", level="domain", intent_type="kb", knowledge_base_id="kb-1")
+    intent = IntentResult(matched_node=node, confidence=0.9)
+    await channel.search("query", intent, top_k=5, query_vector=[0.1] * 10)
+    mock_store.search.assert_awaited_once_with(
+        query_vector=[0.1] * 10, top_k=5, knowledge_base_id="kb-1",
+    )
+
+
+@pytest.mark.asyncio
+async def test_vector_channel_no_route_for_system_intent():
+    mock_store = AsyncMock()
+    mock_store.search = AsyncMock(return_value=[])
+    channel = VectorSearchChannel(vector_store=mock_store, llm=AsyncMock())
+    node = IntentNode(id="n1", name="Chat", level="domain", intent_type="system")
+    intent = IntentResult(matched_node=node, confidence=0.9)
+    await channel.search("query", intent, top_k=5, query_vector=[0.1] * 10)
+    mock_store.search.assert_awaited_once_with(
+        query_vector=[0.1] * 10, top_k=5, knowledge_base_id=None,
+    )
+
+
+@pytest.mark.asyncio
+async def test_keyword_channel_uses_query_vector_param():
+    mock_session = AsyncMock()
+    mock_session_factory = MagicMock()
+    mock_session_factory.return_value.__aenter__ = AsyncMock(return_value=mock_session)
+    mock_session_factory.return_value.__aexit__ = AsyncMock(return_value=False)
+    mock_result = MagicMock()
+    mock_result.all.return_value = []
+    mock_session.execute = AsyncMock(return_value=mock_result)
+
+    channel = KeywordSearchChannel(session_factory=mock_session_factory)
+    results = await channel.search("query", IntentResult(), top_k=5, query_vector=[0.1] * 10)
+    assert isinstance(results, list)
