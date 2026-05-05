@@ -13,6 +13,9 @@ class IntentNodeORM(Base):
     parent_id: Mapped[str | None] = mapped_column(
         ForeignKey("intent_nodes.id"), nullable=True
     )
-    intent_type: Mapped[str] = mapped_column(String(10), default="kb")
+    intent_type: Mapped[str] = mapped_column(String(10), default="system")
+    knowledge_base_id: Mapped[str | None] = mapped_column(
+        ForeignKey("knowledge_bases.id"), nullable=True
+    )
     keywords: Mapped[list] = mapped_column(JSON, default=[])
     description: Mapped[str] = mapped_column(Text, default="")

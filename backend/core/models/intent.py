@@ -8,7 +8,8 @@ class IntentNode(BaseModel):
     name: str
     level: Literal["domain", "category", "topic"]
     parent_id: str | None = None
-    intent_type: Literal["kb", "mcp"] = "kb"
+    intent_type: Literal["kb", "mcp", "system"] = "system"
+    knowledge_base_id: str | None = None
     keywords: list[str] = []
     description: str = ""
 
