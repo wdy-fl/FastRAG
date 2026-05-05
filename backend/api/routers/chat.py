@@ -36,7 +36,7 @@ async def _event_stream(
     # 2. 流式返回 pipeline 事件
     async for event in pipeline.chat(request):
         if isinstance(event, SourcesEvent):
-            payload = event.model_dump(ensure_ascii=False)
+            payload = event.model_dump()
         elif isinstance(event, LLMEvent):
             if event.type == "done":
                 continue  # done 在最后统一发送
