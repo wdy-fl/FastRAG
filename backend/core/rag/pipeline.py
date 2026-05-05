@@ -8,6 +8,7 @@ from backend.core.rag.rewrite import LLMQueryRewriter
 from backend.core.rag.intent import LLMIntentClassifier
 from backend.core.rag.retrieve import MultiChannelRetriever
 from backend.core.rag.prompt import PromptBuilder
+from backend.core.rag.term_mapper import QueryTermMapper
 from backend.core.rag.tracer import RagTracer
 from backend.core.rag.protocols import LLMProvider
 from backend.infra.rerank.bailian import BailianRerankClient
@@ -24,6 +25,7 @@ class RAGPipeline:
         prompt_builder: PromptBuilder,
         tracer: RagTracer,
         reranker: BailianRerankClient | None = None,
+        term_mapper: QueryTermMapper | None = None,
     ) -> None:
         self._llm = llm
         self._memory = memory
@@ -33,6 +35,7 @@ class RAGPipeline:
         self._prompt_builder = prompt_builder
         self._tracer = tracer
         self._reranker = reranker
+        self._term_mapper = term_mapper
 
     async def chat(self, request: ChatRequest) -> AsyncIterator[ChatEvent]:
         start = time.monotonic()
@@ -45,9 +48,16 @@ class RAGPipeline:
                 self._memory.load
             )(request.conversation_id)
 
+            # Term mapping
+            expanded_query = request.query
+            if self._term_mapper:
+                expanded_query = await self._tracer.trace_node("term_mapping")(
+                    self._term_mapper.expand
+                )(request.query)
+
             rewritten = await self._tracer.trace_node("query_rewrite")(
                 self._rewriter.rewrite
-            )(request.query, history)
+            )(expanded_query, history)
 
             sub_queries = await self._tracer.trace_node("query_split")(
                 self._rewriter.split

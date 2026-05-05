@@ -19,6 +19,7 @@ from backend.infra.search.keyword import KeywordSearchChannel
 from backend.infra.rerank.bailian import BailianRerankClient
 from backend.core.rag.prompt import PromptBuilder
 from backend.core.rag.pipeline import RAGPipeline
+from backend.core.rag.term_mapper import QueryTermMapper
 from backend.core.rag.tracer import RagTracer
 from backend.core.ingestion.engine import IngestionEngine
 from backend.core.ingestion.nodes.fetcher import FetcherNode
@@ -120,7 +121,7 @@ def get_intent_repo(
 def get_mapping_repo(
     session: AsyncSession = Depends(get_db_session),
 ) -> MappingRepo:
-    return MappingRepo(session)
+    return MappingRepo(session, cache=get_redis_cache())
 
 
 def get_rag_pipeline(
@@ -160,6 +161,10 @@ def get_rag_pipeline(
         prompt_builder=PromptBuilder(),
         tracer=RagTracer(repo=trace_repo),
         reranker=get_reranker(),
+        term_mapper=QueryTermMapper(
+            mapping_repo=mapping_repo,
+            cache=redis,
+        ),
     )
 
 
