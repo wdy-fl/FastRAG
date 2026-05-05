@@ -286,6 +286,13 @@ export const useChatStore = create<ChatState>((set, get) => ({
         onThinking: ({ content: delta }) => {
           get().appendThinkingContent(delta);
         },
+        onSources: ({ sources }) => {
+          set((s) => ({
+            messages: s.messages.map((m) =>
+              m.id === streamingMsgId ? { ...m, sources } : m
+            ),
+          }));
+        },
         onGuidance: ({ intent }) => {
           set((s) => ({
             messages: s.messages.map((m) =>

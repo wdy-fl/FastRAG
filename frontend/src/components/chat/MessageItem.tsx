@@ -1,5 +1,5 @@
 import * as React from "react";
-import { Brain, ChevronDown, HelpCircle } from "lucide-react";
+import { Brain, ChevronDown, FileText, HelpCircle } from "lucide-react";
 
 import { FeedbackButtons } from "@/components/chat/FeedbackButtons";
 import { MarkdownRenderer } from "@/components/chat/MarkdownRenderer";
@@ -29,6 +29,8 @@ export const MessageItem = React.memo(function MessageItem({ message, isLast }: 
   const [thinkingExpanded, setThinkingExpanded] = React.useState(false);
   const hasThinking = Boolean(message.thinking && message.thinking.trim().length > 0);
   const hasContent = message.content.trim().length > 0;
+  const hasSources = Boolean(message.sources && message.sources.length > 0);
+  const [sourcesExpanded, setSourcesExpanded] = React.useState(false);
   const isWaiting = message.status === "streaming" && !isThinking && !hasContent;
   const guidance = message.guidance as GuidanceIntent | undefined;
   const hasGuidance = Boolean(guidance?.needs_guidance);
@@ -118,6 +120,45 @@ export const MessageItem = React.memo(function MessageItem({ message, isLast }: 
             </div>
           ) : null}
           {hasContent ? <MarkdownRenderer content={message.content} /> : null}
+          {hasSources ? (
+            <div className="overflow-hidden rounded-lg border border-gray-200 bg-gray-50">
+              <button
+                type="button"
+                onClick={() => setSourcesExpanded((prev) => !prev)}
+                className="flex w-full items-center gap-2 px-4 py-2.5 text-left transition-colors hover:bg-gray-100"
+              >
+                <FileText className="h-4 w-4 text-gray-500" />
+                <span className="text-sm font-medium text-gray-700">
+                  引用来源 ({message.sources!.length})
+                </span>
+                <ChevronDown
+                  className={cn(
+                    "ml-auto h-4 w-4 text-gray-400 transition-transform",
+                    sourcesExpanded && "rotate-180"
+                  )}
+                />
+              </button>
+              {sourcesExpanded ? (
+                <div className="border-t border-gray-200 px-4 pb-3">
+                  <ul className="mt-2 space-y-2">
+                    {message.sources!.map((s) => (
+                      <li key={s.ref} className="text-sm text-gray-600">
+                        <span className="mr-1 inline-flex h-5 w-5 items-center justify-center rounded bg-gray-200 text-xs font-medium text-gray-700">
+                          {s.ref}
+                        </span>
+                        {s.document_name ? (
+                          <span className="font-medium text-gray-800">{s.document_name}</span>
+                        ) : null}
+                        <span className="ml-2 text-xs text-gray-400">
+                          相关度 {(s.score * 100).toFixed(1)}%
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              ) : null}
+            </div>
+          ) : null}
           {message.status === "error" ? (
             <p className="text-xs text-rose-500">生成已中断。</p>
           ) : null}

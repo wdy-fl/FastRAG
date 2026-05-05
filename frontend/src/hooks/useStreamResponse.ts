@@ -10,6 +10,16 @@ export interface GuidancePayload {
   intent: unknown;
 }
 
+export interface SourcesPayload {
+  sources: Array<{
+    ref: number;
+    document_id?: string | null;
+    document_name?: string | null;
+    score: number;
+    content: string;
+  }>;
+}
+
 export interface DonePayload {
   title: string;
 }
@@ -18,6 +28,7 @@ export interface StreamHandlers {
   onMeta?: (payload: StreamMetaPayload) => void;
   onMessage?: (payload: MessagePayload) => void;
   onThinking?: (payload: MessagePayload) => void;
+  onSources?: (payload: SourcesPayload) => void;
   onGuidance?: (payload: GuidancePayload) => void;
   onDone?: (payload: DonePayload) => void;
   onError?: (error: Error) => void;
@@ -111,6 +122,9 @@ function dispatchEvent(payload: Record<string, unknown>, handlers: StreamHandler
       break;
     case "thinking":
       handlers.onThinking?.({ content: payload.content as string });
+      break;
+    case "sources":
+      handlers.onSources?.({ sources: payload.sources as SourcesPayload["sources"] });
       break;
     case "guidance":
       handlers.onGuidance?.({ intent: payload.intent });

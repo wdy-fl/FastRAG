@@ -145,6 +145,15 @@ export interface Mapping {
   created_at: string;
 }
 
+// 引用来源（对应后端 SourceItem）
+export interface SourceItem {
+  ref: number;
+  document_id?: string | null;
+  document_name?: string | null;
+  score: number;
+  content: string;
+}
+
 // 客户端专用（不对应后端模型）
 export type FeedbackValue = "like" | "dislike" | null;
 
@@ -154,4 +163,5 @@ export interface ClientMessage extends Message {
   thinkingDurationMs?: number;
   guidance?: unknown;
   feedback?: FeedbackValue;
+  sources?: SourceItem[];
 }
