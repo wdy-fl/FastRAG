@@ -2,6 +2,7 @@ from __future__ import annotations
 import json
 from backend.core.models.intent import IntentNode, IntentResult
 from backend.core.rag.protocols import LLMProvider
+from backend.infra.cache.redis import RedisCache
 
 _CLASSIFY_PROMPT = (
     "You are an intent classifier. Given the following user query and the available intent nodes, "
@@ -16,22 +17,59 @@ class LLMIntentClassifier:
     def __init__(
         self,
         llm: LLMProvider,
-        intent_nodes: list[IntentNode],
+        intent_repo: "IntentRepo | None" = None,
+        cache: RedisCache | None = None,
         confidence_threshold: float = 0.6,
+        intent_nodes: list[IntentNode] | None = None,
     ) -> None:
         self._llm = llm
-        self._nodes = intent_nodes
+        self._repo = intent_repo
+        self._cache = cache
         self._threshold = confidence_threshold
-        self._nodes_by_id: dict[str, IntentNode] = {n.id: n for n in intent_nodes}
+        self._static_nodes: list[IntentNode] = intent_nodes or []
+
+    async def _load_nodes(self) -> list[IntentNode]:
+        if self._repo is not None:
+            CACHE_KEY = "intent:nodes"
+            if self._cache:
+                try:
+                    cached = await self._cache.get(CACHE_KEY)
+                    if cached:
+                        return [IntentNode.model_validate_json(n) for n in json.loads(cached)]
+                except Exception:
+                    pass
+
+            from backend.db.repos.intent import IntentRepo
+            orm_nodes = await self._repo.list_intent_nodes()
+            nodes = [
+                IntentNode(
+                    id=n.id, name=n.name, level=n.level, parent_id=n.parent_id,
+                    intent_type=n.intent_type, keywords=n.keywords or [],
+                    description=n.description or "",
+                    knowledge_base_id=n.knowledge_base_id,
+                )
+                for n in orm_nodes
+            ]
+
+            if self._cache:
+                try:
+                    payload = json.dumps([n.model_dump_json() for n in nodes])
+                    await self._cache.set(CACHE_KEY, payload, ttl=7200)
+                except Exception:
+                    pass
+
+            return nodes
+
+        return self._static_nodes
 
     async def classify(self, query: str) -> IntentResult:
-        # 没有配置意图节点时，跳过分类直接放行
-        if not self._nodes:
+        nodes = await self._load_nodes()
+        if not nodes:
             return IntentResult(needs_guidance=False, confidence=1.0)
 
         nodes_text = "\n".join(
             f"- id={n.id} name={n.name} level={n.level} keywords={n.keywords}"
-            for n in self._nodes
+            for n in nodes
         )
         prompt = _CLASSIFY_PROMPT.format(nodes=nodes_text or "none", query=query)
         parts: list[str] = []
@@ -48,14 +86,15 @@ class LLMIntentClassifier:
 
         confidence = float(data.get("confidence", 0.0))
         matched_id = data.get("matched_id")
-        matched_node = self._nodes_by_id.get(matched_id) if matched_id else None
+        nodes_by_id = {n.id: n for n in nodes}
+        matched_node = nodes_by_id.get(matched_id) if matched_id else None
 
         if confidence < self._threshold:
             return IntentResult(
                 confidence=confidence,
                 needs_guidance=True,
                 guidance_message="Please clarify your question.",
-                candidates=list(self._nodes[:3]),
+                candidates=list(nodes[:3]),
             )
 
         return IntentResult(

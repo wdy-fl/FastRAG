@@ -1,3 +1,4 @@
+import json
 import pytest
 from unittest.mock import AsyncMock, MagicMock
 from backend.core.rag.rewrite import LLMQueryRewriter
@@ -165,3 +166,79 @@ async def test_multi_channel_retriever_uses_rrf():
 
     assert len(results) == 1
     assert results[0].content == "result"
+
+
+@pytest.mark.asyncio
+async def test_classifier_loads_nodes_from_repo():
+    mock_llm = MagicMock()
+    mock_llm.stream = MagicMock(
+        side_effect=lambda msgs, **kw: _make_stream('{"confidence": 0.9, "matched_id": "n1"}')
+    )
+    orm_node = MagicMock(
+        id="n1", name="Finance", level="domain", parent_id=None,
+        intent_type="kb", keywords=["finance"], description="",
+        knowledge_base_id="kb-1",
+    )
+    # Ensure attributes return actual values, not MagicMock objects
+    orm_node.id = "n1"
+    orm_node.name = "Finance"
+    orm_node.level = "domain"
+    orm_node.parent_id = None
+    orm_node.intent_type = "kb"
+    orm_node.keywords = ["finance"]
+    orm_node.description = ""
+    orm_node.knowledge_base_id = "kb-1"
+    mock_repo = AsyncMock()
+    mock_repo.list_intent_nodes = AsyncMock(return_value=[orm_node])
+    mock_cache = AsyncMock()
+    mock_cache.get = AsyncMock(return_value=None)
+    mock_cache.set = AsyncMock()
+
+    classifier = LLMIntentClassifier(
+        llm=mock_llm, intent_repo=mock_repo, cache=mock_cache,
+        confidence_threshold=0.6,
+    )
+    result = await classifier.classify("What is finance?")
+    assert result.matched_node is not None
+    assert result.matched_node.id == "n1"
+
+
+@pytest.mark.asyncio
+async def test_classifier_caches_nodes_in_redis():
+    mock_llm = MagicMock()
+    mock_llm.stream = MagicMock(
+        side_effect=lambda msgs, **kw: _make_stream('{"confidence": 0.9, "matched_id": null}')
+    )
+    mock_repo = AsyncMock()
+    mock_repo.list_intent_nodes = AsyncMock(return_value=[])
+    mock_cache = AsyncMock()
+    mock_cache.get = AsyncMock(return_value=None)
+    mock_cache.set = AsyncMock()
+
+    classifier = LLMIntentClassifier(
+        llm=mock_llm, intent_repo=mock_repo, cache=mock_cache,
+        confidence_threshold=0.6,
+    )
+    await classifier.classify("test")
+    mock_cache.set.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+async def test_classifier_reads_from_redis_cache():
+    mock_llm = MagicMock()
+    mock_repo = AsyncMock()
+    cached_json = json.dumps([IntentNode(
+        id="n1", name="test", level="domain", intent_type="kb",
+        knowledge_base_id="kb-1",
+    ).model_dump_json()])
+    mock_cache = AsyncMock()
+    mock_cache.get = AsyncMock(return_value=cached_json)
+
+    classifier = LLMIntentClassifier(
+        llm=mock_llm, intent_repo=mock_repo, cache=mock_cache,
+        confidence_threshold=0.6,
+    )
+    nodes = await classifier._load_nodes()
+    assert len(nodes) == 1
+    assert nodes[0].id == "n1"
+    mock_repo.list_intent_nodes.assert_not_awaited()
