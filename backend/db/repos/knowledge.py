@@ -139,3 +139,13 @@ class KnowledgeRepo:
         )
         chunks = list((await self._session.execute(stmt)).scalars().all())
         return chunks, total
+
+    async def batch_get_names(self, doc_ids: list[str]) -> dict[str, str]:
+        """批量获取 document_id → filename 映射"""
+        if not doc_ids:
+            return {}
+        stmt = select(
+            KnowledgeDocumentORM.id, KnowledgeDocumentORM.filename
+        ).where(KnowledgeDocumentORM.id.in_(doc_ids))
+        result = await self._session.execute(stmt)
+        return {row.id: row.filename for row in result}

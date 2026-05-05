@@ -62,3 +62,37 @@ def test_prompt_builder_includes_citation_instruction():
     )
     system_msg = messages[0]["content"]
     assert "bracket number" in system_msg.lower() or "[1]" in system_msg
+
+
+from unittest.mock import AsyncMock, MagicMock
+from backend.db.repos.knowledge import KnowledgeRepo
+
+
+@pytest.mark.asyncio
+async def test_batch_get_names_returns_mapping():
+    mock_session = AsyncMock()
+    # Simulate SQLAlchemy result: list of Row objects with .id and .filename
+    row1 = MagicMock()
+    row1.id = "doc-1"
+    row1.filename = "员工手册.pdf"
+    row2 = MagicMock()
+    row2.id = "doc-2"
+    row2.filename = "休假制度.docx"
+    mock_result = AsyncMock()
+    mock_result.__iter__ = MagicMock(return_value=iter([row1, row2]))
+    mock_session.execute = AsyncMock(return_value=mock_result)
+
+    repo = KnowledgeRepo(session=mock_session)
+    result = await repo.batch_get_names(["doc-1", "doc-2"])
+
+    assert result == {"doc-1": "员工手册.pdf", "doc-2": "休假制度.docx"}
+
+
+@pytest.mark.asyncio
+async def test_batch_get_names_empty_input():
+    mock_session = AsyncMock()
+    repo = KnowledgeRepo(session=mock_session)
+    result = await repo.batch_get_names([])
+
+    assert result == {}
+    mock_session.execute.assert_not_awaited()
