@@ -158,6 +158,7 @@ def get_rag_pipeline(
                 KeywordSearchChannel(session_factory=session_factory),
             ],
             llm=embedding_llm,
+            chat_llm=llm,
         ),
         prompt_builder=PromptBuilder(),
         tracer=RagTracer(repo=trace_repo),
