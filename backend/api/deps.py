@@ -111,12 +111,29 @@ def get_trace_repo(
     return TraceRepo(session)
 
 
+def get_intent_repo(
+    session: AsyncSession = Depends(get_db_session),
+) -> IntentRepo:
+    return IntentRepo(session)
+
+
+def get_mapping_repo(
+    session: AsyncSession = Depends(get_db_session),
+) -> MappingRepo:
+    return MappingRepo(session)
+
+
 def get_rag_pipeline(
     conv_repo: ConversationRepo = Depends(get_conversation_repo),
     trace_repo: TraceRepo = Depends(get_trace_repo),
+    intent_repo: IntentRepo = Depends(get_intent_repo),
+    mapping_repo: MappingRepo = Depends(get_mapping_repo),
 ) -> RAGPipeline:
     s = get_settings()
     llm = get_llm_provider()
+    embedding_llm = get_embedding_provider()
+    redis = get_redis_cache()
+    session_factory = get_session_factory()
     return RAGPipeline(
         llm=llm,
         memory=SlidingWindowMemory(
@@ -128,15 +145,17 @@ def get_rag_pipeline(
         rewriter=LLMQueryRewriter(llm=llm),
         intent_classifier=LLMIntentClassifier(
             llm=llm,
-            intent_nodes=[],
+            intent_repo=intent_repo,
+            cache=redis,
             confidence_threshold=s.rag_intent_confidence_threshold,
         ),
         retriever=MultiChannelRetriever(
             channels=[
-                VectorSearchChannel(vector_store=get_vector_store(), llm=get_embedding_provider()),
-                QuestionSearchChannel(vector_store=get_vector_store(), llm=get_embedding_provider()),
-                KeywordSearchChannel(session_factory=get_session_factory()),
+                VectorSearchChannel(vector_store=get_vector_store(), llm=embedding_llm),
+                QuestionSearchChannel(vector_store=get_vector_store(), llm=embedding_llm),
+                KeywordSearchChannel(session_factory=session_factory),
             ],
+            llm=embedding_llm,
         ),
         prompt_builder=PromptBuilder(),
         tracer=RagTracer(repo=trace_repo),
@@ -177,18 +196,6 @@ def get_ingestion_engine() -> IngestionEngine:
             ),
         }
     )
-
-
-def get_intent_repo(
-    session: AsyncSession = Depends(get_db_session),
-) -> IntentRepo:
-    return IntentRepo(session)
-
-
-def get_mapping_repo(
-    session: AsyncSession = Depends(get_db_session),
-) -> MappingRepo:
-    return MappingRepo(session)
 
 
 def get_ingestion_task_repo(
