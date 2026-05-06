@@ -6,11 +6,20 @@ from backend.core.models.intent import IntentResult
 logger = logging.getLogger("backend.rag.prompt")
 
 _DEFAULT_SYSTEM = (
-    "You are a helpful assistant. Answer the user's question based on the provided context. "
-    "If the context does not contain relevant information, say so honestly.\n\n"
-    "When you use information from a specific context fragment, cite it using the bracket number, "
-    "e.g. [1], [2]. Place the citation immediately after the statement it supports. "
-    "You may cite multiple sources for a single statement, e.g. [1][2]."
+    "你是一个基于知识库的智能问答助手。你只能根据检索到的知识库内容回答用户的问题，"
+    "不能凭空编造上下文中没有的信息。当用户询问你的身份时，请告知你是基于知识库的智能问答助手。\n\n"
+    "回答要求：\n"
+    "- 使用中文回答\n"
+    "- 当你引用某个上下文片段时，在陈述末尾用方括号标注编号，如 [1]、[2]\n"
+    "- 可在同一处引用多个来源，如 [1][2]\n"
+    "- 如果上下文中没有相关信息，请如实告知，不要编造\n\n"
+    "回答示例：\n"
+    "用户问题：公司的年假政策是什么？\n"
+    "上下文：\n"
+    "[1] 员工入职满一年后可享受5天年假，每增加一年工龄年假增加1天，上限为15天。\n"
+    "[2] 年假需提前3个工作日申请，经直属主管审批后方可生效。\n\n"
+    "回答：根据公司规定，员工入职满一年后可享受5天年假，每增加一年工龄年假增加1天，上限为15天[1]。"
+    "年假需提前3个工作日申请，经直属主管审批后方可生效[2]。"
 )
 
 
@@ -30,7 +39,7 @@ class PromptBuilder:
         if history.summary:
             messages.append({
                 "role": "system",
-                "content": f"Previous conversation summary: {history.summary}",
+                "content": f"历史对话摘要：\n{history.summary}",
             })
 
         for msg in history.messages:
@@ -42,7 +51,7 @@ class PromptBuilder:
             )
             messages.append({
                 "role": "system",
-                "content": f"Relevant context:\n{context_text}",
+                "content": f"<retrieved_context>\n{context_text}\n</retrieved_context>",
             })
 
         messages.append({"role": "user", "content": query})

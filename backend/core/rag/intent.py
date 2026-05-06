@@ -8,11 +8,11 @@ from backend.infra.cache.redis import RedisCache
 logger = logging.getLogger("backend.rag.intent")
 
 _CLASSIFY_PROMPT = (
-    "You are an intent classifier. Given the following user query and the available intent nodes, "
-    "identify the best matching intent node.\n"
-    "Available nodes:\n{nodes}\n\n"
-    "Query: {query}\n\n"
-    "Respond with JSON only: {{\"confidence\": <0.0-1.0>, \"matched_id\": <node_id or null>}}"
+    "你是一个意图分类器。根据以下用户查询和可用的意图节点，"
+    "识别最匹配的意图节点。\n"
+    "可用节点:\n{nodes}\n\n"
+    "查询: {query}\n\n"
+    "仅以JSON格式回复: {{\"confidence\": <0.0-1.0>, \"matched_id\": <节点id或null>}}"
 )
 
 
@@ -88,7 +88,7 @@ class LLMIntentClassifier:
             data = json.loads(raw)
         except (json.JSONDecodeError, ValueError):
             logger.warning("意图分类 | JSON解析失败 | raw=%s", raw[:200])
-            return IntentResult(needs_guidance=True, guidance_message="Intent classification failed.")
+            return IntentResult(needs_guidance=True, guidance_message="意图分类失败。")
 
         confidence = float(data.get("confidence", 0.0))
         matched_id = data.get("matched_id")
@@ -114,7 +114,7 @@ class LLMIntentClassifier:
             return IntentResult(
                 confidence=confidence,
                 needs_guidance=True,
-                guidance_message="Please clarify your question.",
+                guidance_message="请进一步澄清您的问题。",
                 candidates=list(nodes[:3]),
             )
 

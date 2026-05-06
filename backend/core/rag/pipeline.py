@@ -137,6 +137,7 @@ class RAGPipeline:
                     request.conversation_id,
                     query=request.query,
                     answer="".join(answer_parts),
+                    sources=None,
                 )
                 total_ms = int((time.monotonic() - start) * 1000)
                 await self._tracer.finish_run(status="success", total_duration_ms=total_ms)
@@ -175,6 +176,7 @@ class RAGPipeline:
                     document_name=doc_name_map.get(c.document_id),
                     score=c.score,
                     content=c.content,
+                    summary=c.metadata.get("summary"),
                 )
                 for i, c in enumerate(retrieved)
             ]
@@ -209,10 +211,12 @@ class RAGPipeline:
             )
 
             # ── Step 11: 保存记忆 ──
+            sources_data = [s.model_dump() for s in source_items] if source_items else None
             await self._memory.save(
                 request.conversation_id,
                 query=request.query,
                 answer="".join(answer_parts),
+                sources=sources_data,
             )
             total_ms = int((time.monotonic() - start) * 1000)
             await self._tracer.finish_run(status="success", total_duration_ms=total_ms)

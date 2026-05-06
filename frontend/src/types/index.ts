@@ -104,6 +104,7 @@ export interface Message {
   content: string;
   thinking?: string;
   status?: "pending" | "streaming" | "done" | "error" | "cancelled";
+  sources?: SourceItem[];
   created_at: string;
 }
 
@@ -150,6 +151,7 @@ export interface SourceItem {
   document_name?: string | null;
   score: number;
   content: string;
+  summary?: string | null;
 }
 
 // 客户端专用（不对应后端模型）

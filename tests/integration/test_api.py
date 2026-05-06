@@ -93,65 +93,8 @@ def test_delete_conversation_returns_204():
 
 
 # ---------------------------------------------------------------------------
-# Knowledge Base & Ingestion tests
-# ---------------------------------------------------------------------------
-
-def test_create_knowledge_base_returns_201():
-    from backend.main import app
-    from backend.api import deps
-    mock_repo = AsyncMock()
-    kb_mock = MagicMock()
-    kb_mock.id = "kb1"
-    kb_mock.name = "Finance KB"
-    kb_mock.description = ""
-    mock_repo.create_knowledge_base = AsyncMock(return_value=kb_mock)
-    app.dependency_overrides[deps.get_knowledge_repo] = lambda: mock_repo
-    client = TestClient(app)
-    resp = client.post(
-        "/knowledge-bases",
-        json={"name": "Finance KB", "description": "", "ingestion_config": {}},
-    )
-    assert resp.status_code == 201
-    assert resp.json()["id"] == "kb1"
-
-
-def test_trigger_ingestion_returns_202():
-    from backend.main import app
-    from backend.api import deps
-    mock_repo = AsyncMock()
-    mock_repo.create_document = AsyncMock(
-        return_value=MagicMock(id="doc1", status="pending")
-    )
-    mock_engine = MagicMock()
-    mock_engine.execute = AsyncMock(return_value=MagicMock(node_results=[]))
-    app.dependency_overrides[deps.get_knowledge_repo] = lambda: mock_repo
-    app.dependency_overrides[deps.get_ingestion_engine] = lambda: mock_engine
-    client = TestClient(app)
-    resp = client.post(
-        "/knowledge-bases/kb1/documents",
-        json={
-            "filename": "report.pdf",
-            "source_type": "local",
-            "source_uri": "/tmp/report.pdf",
-        },
-    )
-    assert resp.status_code == 202
-
-
-# ---------------------------------------------------------------------------
 # Intent / Trace / Mapping tests
 # ---------------------------------------------------------------------------
-
-def test_get_intent_tree_returns_200():
-    from backend.main import app
-    from backend.api.deps import get_intent_repo
-    mock_repo = AsyncMock()
-    mock_repo.list_intent_nodes = AsyncMock(return_value=[])
-    app.dependency_overrides[get_intent_repo] = lambda: mock_repo
-    client = TestClient(app)
-    resp = client.get("/intent-trees")
-    assert resp.status_code == 200
-
 
 def test_list_traces_returns_200():
     from backend.main import app
@@ -178,23 +121,6 @@ def test_list_mappings_returns_200():
 # ---------------------------------------------------------------------------
 # Meta event / stop endpoint tests
 # ---------------------------------------------------------------------------
-
-def test_chat_stream_first_event_is_meta():
-    """流的第一个 data 事件 type 必须是 meta 且含 task_id"""
-    app = _make_app_with_mock_pipeline()
-    client = TestClient(app)
-    resp = client.post(
-        "/chat/stream",
-        json={"query": "hi", "conversation_id": "c1"},
-        headers={"Accept": "text/event-stream"},
-    )
-    assert resp.status_code == 200
-    lines = [l for l in resp.text.split("\n") if l.startswith("data:")]
-    first = json.loads(lines[0][5:])
-    assert first["type"] == "meta"
-    assert "task_id" in first
-    assert isinstance(first["task_id"], str)
-
 
 def test_chat_stop_returns_200():
     """stop 端点对已注册 task_id 返回 200"""

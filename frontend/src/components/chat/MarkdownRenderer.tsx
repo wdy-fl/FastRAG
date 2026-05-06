@@ -14,9 +14,10 @@ import { useThemeStore } from "@/stores/themeStore";
 
 interface MarkdownRendererProps {
   content: string;
+  onCitationClick?: (ref: number) => void;
 }
 
-export function MarkdownRenderer({ content }: MarkdownRendererProps) {
+export function MarkdownRenderer({ content, onCitationClick }: MarkdownRendererProps) {
   const theme = useThemeStore((state) => state.theme);
 
   return (
@@ -161,6 +162,21 @@ export function MarkdownRenderer({ content }: MarkdownRendererProps) {
               {children}
             </ol>
           );
+        },
+        p({ children, ...props }) {
+          return (
+            <p {...props}>
+              {typeof children === "string"
+                ? renderCitationTags(children, onCitationClick)
+                : Array.isArray(children)
+                  ? children.map((child, idx) =>
+                      typeof child === "string"
+                        ? React.createElement(React.Fragment, { key: idx }, renderCitationTags(child, onCitationClick))
+                        : child
+                    )
+                  : children}
+            </p>
+          );
         }
       }}
       className="prose prose-gray max-w-none dark:prose-invert prose-headings:font-semibold prose-headings:text-[#1A1A1A] dark:prose-headings:text-[#EEEEEE] prose-p:text-[#333333] dark:prose-p:text-[#CCCCCC] prose-p:leading-relaxed prose-li:text-[#333333] dark:prose-li:text-[#CCCCCC] prose-strong:text-[#1A1A1A] dark:prose-strong:text-[#EEEEEE]"
@@ -168,6 +184,36 @@ export function MarkdownRenderer({ content }: MarkdownRendererProps) {
       {content}
     </ReactMarkdown>
   );
+}
+
+const CITATION_RE = /(\[\d+\])/g;
+
+function renderCitationTags(
+  text: string,
+  onCitationClick?: (ref: number) => void,
+): React.ReactNode[] {
+  const parts = text.split(CITATION_RE);
+  if (parts.length <= 1) return [text];
+  return parts.map((part, idx) => {
+    const match = /^\[(\d+)\]$/.exec(part);
+    if (match) {
+      const ref = parseInt(match[1], 10);
+      return (
+        <span
+          key={idx}
+          className="citation-tag inline-flex h-[1.2em] min-w-[1.2em] cursor-pointer items-center justify-center rounded bg-blue-100 px-0.5 align-text-bottom text-[0.8em] font-medium text-blue-700 hover:bg-blue-200 dark:bg-blue-900 dark:text-blue-300 dark:hover:bg-blue-800"
+          data-ref={ref}
+          onClick={(e) => {
+            e.stopPropagation();
+            onCitationClick?.(ref);
+          }}
+        >
+          [{ref}]
+        </span>
+      );
+    }
+    return part;
+  });
 }
 
 function CopyButton({ value }: { value: string }) {

@@ -31,9 +31,21 @@ export const MessageItem = React.memo(function MessageItem({ message, isLast }: 
   const hasContent = message.content.trim().length > 0;
   const hasSources = Boolean(message.sources && message.sources.length > 0);
   const [sourcesExpanded, setSourcesExpanded] = React.useState(false);
+  const sourceListRef = React.useRef<HTMLUListElement>(null);
   const isWaiting = message.status === "streaming" && !isThinking && !hasContent;
   const guidance = message.guidance as GuidanceIntent | undefined;
   const hasGuidance = Boolean(guidance?.needs_guidance);
+
+  const handleCitationClick = React.useCallback((ref: number) => {
+    setSourcesExpanded(true);
+    // 延迟滚动，等面板展开后再定位
+    requestAnimationFrame(() => {
+      const el = sourceListRef.current?.querySelector(`[data-source-ref="${ref}"]`);
+      el?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+      el?.classList.add("ring-2", "ring-blue-400");
+      setTimeout(() => el?.classList.remove("ring-2", "ring-blue-400"), 1500);
+    });
+  }, []);
 
   if (isUser) {
     return (
@@ -119,7 +131,7 @@ export const MessageItem = React.memo(function MessageItem({ message, isLast }: 
               </div>
             </div>
           ) : null}
-          {hasContent ? <MarkdownRenderer content={message.content} /> : null}
+          {hasContent ? <MarkdownRenderer content={message.content} onCitationClick={handleCitationClick} /> : null}
           {hasSources ? (
             <div className="overflow-hidden rounded-lg border border-gray-200 bg-gray-50">
               <button
@@ -140,20 +152,29 @@ export const MessageItem = React.memo(function MessageItem({ message, isLast }: 
               </button>
               {sourcesExpanded ? (
                 <div className="border-t border-gray-200 px-4 pb-3">
-                  <ul className="mt-2 space-y-2">
-                    {message.sources!.map((s) => (
-                      <li key={s.ref} className="text-sm text-gray-600">
-                        <span className="mr-1 inline-flex h-5 w-5 items-center justify-center rounded bg-gray-200 text-xs font-medium text-gray-700">
-                          {s.ref}
-                        </span>
-                        {s.document_name ? (
-                          <span className="font-medium text-gray-800">{s.document_name}</span>
-                        ) : null}
-                        <span className="ml-2 text-xs text-gray-400">
-                          相关度 {(s.score * 100).toFixed(1)}%
-                        </span>
-                      </li>
-                    ))}
+                  <ul ref={sourceListRef} className="mt-2 space-y-2">
+                    {message.sources!.map((s) => {
+                      const preview = s.summary || (s.content.length > 100 ? s.content.slice(0, 100) + "…" : s.content);
+                      return (
+                        <li
+                          key={s.ref}
+                          data-source-ref={s.ref}
+                          className="rounded-md border border-gray-100 bg-white p-2.5 transition-all dark:border-gray-700 dark:bg-gray-800"
+                        >
+                          <div className="flex items-center gap-2">
+                            <span className="inline-flex h-5 w-5 items-center justify-center rounded bg-blue-100 text-xs font-medium text-blue-700 dark:bg-blue-900 dark:text-blue-300">
+                              {s.ref}
+                            </span>
+                            {s.document_name ? (
+                              <span className="text-sm font-medium text-gray-800 dark:text-gray-200">{s.document_name}</span>
+                            ) : null}
+                          </div>
+                          <p className="mt-1.5 text-xs leading-relaxed text-gray-500 dark:text-gray-400">
+                            {preview}
+                          </p>
+                        </li>
+                      );
+                    })}
                   </ul>
                 </div>
               ) : null}

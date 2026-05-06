@@ -36,11 +36,13 @@ class SlidingWindowMemory:
         return ConversationHistory(messages=messages, summary=summary_text)
 
     async def save(
-        self, conversation_id: str, query: str, answer: str
+        self, conversation_id: str, query: str, answer: str,
+        sources: list[dict] | None = None,
     ) -> None:
         await self._repo.save_message(conversation_id, role="user", content=query)
         await self._repo.save_message(
-            conversation_id, role="assistant", content=answer
+            conversation_id, role="assistant", content=answer,
+            sources=sources,
         )
         total = await self._repo.count_messages(conversation_id)
         logger.info(
@@ -62,9 +64,9 @@ class SlidingWindowMemory:
             f"{msg.role}: {msg.content}" for msg in recent
         )
         prompt = (
-            f"Summarize this conversation history concisely.\n"
-            f"Previous summary: {existing_text}\n"
-            f"Recent messages:\n{history_text}"
+            f"请简洁地总结以下对话历史。\n"
+            f"之前的摘要: {existing_text}\n"
+            f"近期消息:\n{history_text}"
         )
         parts: list[str] = []
         async for event in self._llm.stream(

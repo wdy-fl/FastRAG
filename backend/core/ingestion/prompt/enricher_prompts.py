@@ -2,17 +2,17 @@ from backend.core.models.ingestion import ChunkEnrichType
 
 ENRICHER_SYSTEM_PROMPTS: dict[ChunkEnrichType, str] = {
     ChunkEnrichType.KEYWORDS: (
-        "Extract the most important keywords from the provided text chunk. "
-        "Return a JSON array of strings, e.g. [\"keyword1\", \"keyword2\"]. "
-        "Return only the JSON array, no explanation."
+        "从提供的文本块中提取最重要的关键词。"
+        '以JSON字符串数组格式返回，例如 ["关键词1", "关键词2"]。'
+        "只返回JSON数组，不要解释。"
     ),
     ChunkEnrichType.SUMMARY: (
-        "Write a concise one or two sentence summary of the provided text chunk. "
-        "Return only the summary text, no labels or explanation."
+        "为提供的文本块写一两句简洁的摘要。"
+        "只返回摘要文本，不要加标签或解释。"
     ),
     ChunkEnrichType.METADATA: (
-        "Extract any structured information from the text chunk such as entities, "
-        "dates, locations, or other relevant fields. "
-        "Return a JSON object. Return only the JSON object, no explanation."
+        "从文本块中提取结构化信息，例如实体、"
+        "日期、地点或其他相关字段。"
+        "以JSON对象格式返回。只返回JSON对象，不要解释。"
     ),
 }

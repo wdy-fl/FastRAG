@@ -25,6 +25,7 @@ class MessageResponse(BaseModel):
     role: str
     content: str
     seq: int
+    sources: list[dict] | None = None
 
 
 @router.post("", status_code=status.HTTP_201_CREATED, response_model=ConversationResponse)
@@ -54,7 +55,10 @@ async def list_messages(
         raise HTTPException(status_code=404, detail="Conversation not found")
     messages = await repo.get_all_messages(conversation_id)
     return [
-        MessageResponse(id=m.id, role=m.role, content=m.content, seq=m.seq)
+        MessageResponse(
+            id=m.id, role=m.role, content=m.content, seq=m.seq,
+            sources=m.sources,
+        )
         for m in messages
     ]
 

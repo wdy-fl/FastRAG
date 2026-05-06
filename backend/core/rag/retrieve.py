@@ -11,8 +11,8 @@ logger = logging.getLogger("backend.rag.retrieve")
 
 _KEYWORD_EXTRACT_PROMPT = (
     "从以下查询中提取3-5个用于关键词检索的短关键词，每个关键词1-4个字。"
-    'Return a JSON array of strings, e.g. ["keyword1", "keyword2"]. '
-    "Return only the JSON array, no explanation."
+    '以JSON字符串数组格式返回，例如 ["关键词1", "关键词2"]。'
+    "只返回JSON数组，不要解释。"
 )
 
 

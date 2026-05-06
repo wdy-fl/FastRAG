@@ -55,6 +55,7 @@ class SourceItem(BaseModel):
     document_name: str | None = None
     score: float
     content: str
+    summary: str | None = None
 
 
 class SourcesEvent(BaseModel):

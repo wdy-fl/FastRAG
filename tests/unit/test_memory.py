@@ -65,7 +65,7 @@ async def test_save_persists_messages():
     await memory.save("conv-1", query="What is AI?", answer="AI is...")
 
     mock_repo.save_message.assert_any_await("conv-1", role="user", content="What is AI?")
-    mock_repo.save_message.assert_any_await("conv-1", role="assistant", content="AI is...")
+    mock_repo.save_message.assert_any_await("conv-1", role="assistant", content="AI is...", sources=None)
 
 
 @pytest.mark.asyncio

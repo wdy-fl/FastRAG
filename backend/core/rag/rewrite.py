@@ -16,9 +16,9 @@ _REWRITE_PROMPT = (
 )
 
 _SPLIT_PROMPT = (
-    "You are a query analyzer. If the following query contains multiple distinct questions, "
-    "split it into a numbered list of sub-questions. If it is a single question, return it as '1. <query>'.\n"
-    "Return only the numbered list.\nQuery: {query}"
+    "你是一个查询分析器。如果以下查询包含多个独立的问题，"
+    "将其拆分为编号的子问题列表。如果是单个问题，返回 '1. <查询>'。\n"
+    "只返回编号列表，不要解释。\n查询: {query}"
 )
 
 

@@ -178,7 +178,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
         isDeepThinking: false,
         isThinking: false,
         status: "done" as const,
-      }));
+      })) as ClientMessage[];
       set({ messages: mapped });
     } catch (error) {
       toast.error((error as Error).message || "加载消息失败");

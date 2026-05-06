@@ -34,7 +34,8 @@ class ConversationRepo:
         return list(reversed(rows))
 
     async def save_message(
-        self, conversation_id: str, role: str, content: str
+        self, conversation_id: str, role: str, content: str,
+        sources: list[dict] | None = None,
     ) -> MessageORM:
         count = await self.count_messages(conversation_id)
         msg = MessageORM(
@@ -43,6 +44,7 @@ class ConversationRepo:
             seq=count + 1,
             role=role,
             content=content,
+            sources=sources,
         )
         self._session.add(msg)
         await self._session.commit()

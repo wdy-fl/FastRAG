@@ -2,6 +2,7 @@ from __future__ import annotations
 from datetime import datetime
 from sqlalchemy import ForeignKey, String, Text, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
+from sqlalchemy.dialects.postgresql import JSON
 from backend.db.models.base import Base
 
 
@@ -30,6 +31,7 @@ class MessageORM(Base):
     seq: Mapped[int] = mapped_column()
     role: Mapped[str] = mapped_column(String(20))
     content: Mapped[str] = mapped_column(Text)
+    sources: Mapped[list | None] = mapped_column(JSON, nullable=True)
     created_at: Mapped[datetime] = mapped_column(server_default=func.now())
     conversation: Mapped[ConversationORM] = relationship(back_populates="messages")
 
