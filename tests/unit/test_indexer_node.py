@@ -78,3 +78,39 @@ async def test_indexer_skips_questions_when_empty():
     await node.execute(ctx, IndexerSettings())
 
     assert mock_llm.embed.call_count == 1  # only chunks, no questions
+
+
+@pytest.mark.asyncio
+async def test_indexer_calls_bm25_mark_dirty():
+    """IndexerNode 应在入库完成后调用 bm25_manager.mark_dirty()。"""
+    mock_llm = AsyncMock()
+    mock_llm.embed = AsyncMock(return_value=[[0.1] * 1024])
+    mock_store = AsyncMock()
+    mock_store.upsert = AsyncMock()
+
+    mock_bm25 = MagicMock()
+    mock_bm25.mark_dirty = MagicMock()
+
+    node = IndexerNode(
+        llm=mock_llm,
+        vector_store=mock_store,
+        bm25_manager=mock_bm25,
+    )
+    ctx = _make_context()
+    await node.execute(ctx, IndexerSettings())
+
+    mock_bm25.mark_dirty.assert_called_once()
+
+
+@pytest.mark.asyncio
+async def test_indexer_no_bm25_manager_no_error():
+    """没有 bm25_manager 时 IndexerNode 不应报错。"""
+    mock_llm = AsyncMock()
+    mock_llm.embed = AsyncMock(return_value=[[0.1] * 1024])
+    mock_store = AsyncMock()
+    mock_store.upsert = AsyncMock()
+
+    node = IndexerNode(llm=mock_llm, vector_store=mock_store)
+    ctx = _make_context()
+    # Should not raise
+    await node.execute(ctx, IndexerSettings())

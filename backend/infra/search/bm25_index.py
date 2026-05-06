@@ -57,7 +57,15 @@ class Bm25IndexManager:
     async def ensure_ready(self) -> None:
         if not self._dirty:
             return
-        await self.build()
+        # Claim the rebuild slot: swap to False before building
+        # so concurrent callers skip the rebuild
+        self._dirty = False
+        try:
+            await self.build()
+        except Exception:
+            # Rebuild failed; mark dirty so next call retries
+            self._dirty = True
+            raise
 
     async def build(self) -> None:
         logger.info("BM25索引构建开始...")
