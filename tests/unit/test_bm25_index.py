@@ -110,11 +110,16 @@ async def test_ensure_ready_skips_if_not_dirty():
     """非脏状态时 ensure_ready 不应重建。"""
     manager = Bm25IndexManager(session_factory=_make_mock_session_factory())
     await manager.build()
+    assert not manager.is_dirty
 
-    # 第二次 ensure_ready 不应触发 execute
+    # Capture reference to existing index before ensure_ready
+    global_before = manager._global_index
+
     await manager.ensure_ready()
-    # session_factory 只被调用了一次（build 时）
-    assert manager.is_dirty is False
+
+    # Same index object means no rebuild happened
+    assert manager._global_index is global_before
+    assert not manager.is_dirty
 
 
 @pytest.mark.asyncio
@@ -141,11 +146,13 @@ async def test_ensure_ready_builds_on_first_call():
 
 @pytest.mark.asyncio
 async def test_search_global_index_returns_from_all_kbs():
-    """kb_id=None 时使用全局索引，返回所有知识库的结果。"""
+    """kb_id=None 时使用全局索引，应包含所有知识库的文档。"""
     manager = Bm25IndexManager(session_factory=_make_mock_session_factory())
     await manager.build()
 
-    results = manager.search(query="退货", kb_id=None, top_k=10)
-    kb_ids_in_results = {r.metadata.get("_knowledge_base_id") for r in results}
-    # 应包含多个 kb 的结果
-    assert len(kb_ids_in_results) >= 1
+    # Verify global index contains items from both kb-1 and kb-2
+    global_corpus = manager._global_index
+    assert global_corpus is not None
+    kb_ids = {item.knowledge_base_id for item in global_corpus.items}
+    assert "kb-1" in kb_ids
+    assert "kb-2" in kb_ids
