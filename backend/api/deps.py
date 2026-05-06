@@ -15,7 +15,8 @@ from backend.core.rag.memory import SlidingWindowMemory
 from backend.core.rag.rewrite import LLMQueryRewriter
 from backend.core.rag.intent import LLMIntentClassifier
 from backend.core.rag.retrieve import MultiChannelRetriever, VectorSearchChannel, QuestionSearchChannel
-from backend.infra.search.keyword import KeywordSearchChannel
+from backend.infra.search.keyword import Bm25KeywordChannel
+from backend.infra.search.bm25_index import Bm25IndexManager
 from backend.core.rag.protocols import Reranker
 from backend.infra.rerank.bailian import BailianRerankClient
 from backend.core.rag.prompt import PromptBuilder
@@ -156,7 +157,7 @@ def get_rag_pipeline(
             channels=[
                 VectorSearchChannel(vector_store=get_vector_store(), llm=embedding_llm),
                 QuestionSearchChannel(vector_store=get_vector_store(), llm=embedding_llm),
-                KeywordSearchChannel(session_factory=session_factory),
+                Bm25KeywordChannel(bm25_manager=Bm25IndexManager(session_factory=session_factory)),
             ],
             llm=embedding_llm,
             chat_llm=llm,

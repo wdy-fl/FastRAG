@@ -7,7 +7,8 @@ from backend.core.rag.retrieve import (
     MultiChannelRetriever, VectorSearchChannel,
     QuestionSearchChannel, RrfProcessor,
 )
-from backend.infra.search.keyword import KeywordSearchChannel
+from backend.infra.search.keyword import Bm25KeywordChannel
+from backend.infra.search.bm25_index import Bm25IndexManager
 from backend.core.rag.prompt import PromptBuilder
 from backend.core.models.chat import ConversationHistory, LLMEvent, RetrievedChunk
 from backend.core.models.intent import IntentNode, IntentResult
@@ -18,6 +19,29 @@ def _make_stream(content: str):
     async def _gen():
         yield LLMEvent(type="content", content=content)
     return _gen()
+
+
+def _make_bm25_manager_with_data():
+    """构造一个预构建了测试数据的 Bm25IndexManager。"""
+    mock_result = MagicMock()
+    mock_chunks = [
+        MagicMock(
+            id="c1",
+            content="退货退款政策说明，30日内可申请退货退款",
+            document_id="doc-1",
+            knowledge_base_id="kb-1",
+            metadata_={"filename": "refund.pdf"},
+        ),
+    ]
+    mock_result.scalars.return_value.all.return_value = mock_chunks
+    mock_session = AsyncMock()
+    mock_session.execute = AsyncMock(return_value=mock_result)
+    mock_sf = MagicMock()
+    mock_sf.return_value.__aenter__ = AsyncMock(return_value=mock_session)
+    mock_sf.return_value.__aexit__ = AsyncMock(return_value=False)
+
+    manager = Bm25IndexManager(session_factory=mock_sf)
+    return manager
 
 
 @pytest.mark.asyncio
@@ -127,24 +151,6 @@ async def test_question_channel_calls_search_questions():
     mock_store.search_questions.assert_awaited_once()
     assert len(results) == 1
     assert results[0].content == "question result"
-
-
-@pytest.mark.asyncio
-async def test_keyword_channel_searches_by_tsquery():
-    mock_session = AsyncMock()
-    mock_session_factory = MagicMock()
-    mock_session_factory.return_value.__aenter__ = AsyncMock(return_value=mock_session)
-    mock_session_factory.return_value.__aexit__ = AsyncMock(return_value=False)
-
-    mock_result = MagicMock()
-    mock_result.all.return_value = []
-    mock_session.execute = AsyncMock(return_value=mock_result)
-
-    channel = KeywordSearchChannel(session_factory=mock_session_factory)
-    results = await channel.search("退款政策", IntentResult(), top_k=5, query_vector=[0.1] * 10)
-
-    mock_session.execute.assert_awaited_once()
-    assert isinstance(results, list)
 
 
 @pytest.mark.asyncio
@@ -294,15 +300,53 @@ async def test_vector_channel_no_route_for_system_intent():
 
 
 @pytest.mark.asyncio
-async def test_keyword_channel_uses_query_vector_param():
-    mock_session = AsyncMock()
-    mock_session_factory = MagicMock()
-    mock_session_factory.return_value.__aenter__ = AsyncMock(return_value=mock_session)
-    mock_session_factory.return_value.__aexit__ = AsyncMock(return_value=False)
-    mock_result = MagicMock()
-    mock_result.all.return_value = []
-    mock_session.execute = AsyncMock(return_value=mock_result)
+async def test_bm25_keyword_channel_searches():
+    """Bm25KeywordChannel 应通过 BM25 索引搜索并返回结果。"""
+    manager = _make_bm25_manager_with_data()
+    await manager.build()
 
-    channel = KeywordSearchChannel(session_factory=mock_session_factory)
-    results = await channel.search("query", IntentResult(), top_k=5, query_vector=[0.1] * 10)
+    channel = Bm25KeywordChannel(bm25_manager=manager)
+    results = await channel.search(
+        "退货退款", IntentResult(), top_k=5, query_vector=[0.1] * 10,
+    )
+    assert isinstance(results, list)
+    assert len(results) > 0
+    assert "退货退款" in results[0].content
+
+
+@pytest.mark.asyncio
+async def test_bm25_keyword_channel_ignores_query_vector():
+    """Bm25KeywordChannel 应忽略 query_vector 参数（协议兼容）。"""
+    manager = _make_bm25_manager_with_data()
+    await manager.build()
+
+    channel = Bm25KeywordChannel(bm25_manager=manager)
+    # 不应报错，query_vector 被忽略
+    results = await channel.search(
+        "测试", IntentResult(), top_k=5, query_vector=[0.1] * 10,
+    )
+    assert isinstance(results, list)
+
+
+@pytest.mark.asyncio
+async def test_bm25_keyword_channel_routes_to_kb():
+    """Bm25KeywordChannel 应根据 intent 路由到指定知识库。"""
+    manager = _make_bm25_manager_with_data()
+    await manager.build()
+
+    channel = Bm25KeywordChannel(bm25_manager=manager)
+    node = IntentNode(id="n1", name="Finance", intent_type="kb", knowledge_base_id="kb-1")
+    intent = IntentResult(matched_node=node, confidence=0.9)
+    results = await channel.search("退货", intent, top_k=5, query_vector=[0.1] * 10)
+    assert isinstance(results, list)
+
+
+@pytest.mark.asyncio
+async def test_bm25_keyword_channel_no_route_searches_global():
+    """无匹配意图时 Bm25KeywordChannel 应使用全局索引。"""
+    manager = _make_bm25_manager_with_data()
+    await manager.build()
+
+    channel = Bm25KeywordChannel(bm25_manager=manager)
+    results = await channel.search("退货", IntentResult(), top_k=5, query_vector=[0.1] * 10)
     assert isinstance(results, list)
