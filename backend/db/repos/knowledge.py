@@ -3,8 +3,11 @@ from uuid import uuid4
 from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 from backend.db.models.knowledge import (
-    KnowledgeBaseORM, KnowledgeDocumentORM, KnowledgeChunkORM, KnowledgeDocQuestionORM
+    KnowledgeBaseORM, KnowledgeDocumentORM, KnowledgeChunkORM, KnowledgeDocQuestionORM,
+    QueryTermMappingORM,
 )
+from backend.db.models.ingestion import IngestionTaskORM
+from backend.db.models.intent import IntentNodeORM
 
 
 class KnowledgeRepo:
@@ -89,7 +92,29 @@ class KnowledgeRepo:
         return result.scalar_one_or_none()
 
     async def delete_knowledge_base(self, kb_id: str) -> None:
-        from sqlalchemy import delete
+        from sqlalchemy import delete, update as sa_update
+        # Delete children first to satisfy FK constraints (leaf → root order)
+        await self._session.execute(
+            delete(IngestionTaskORM).where(IngestionTaskORM.knowledge_base_id == kb_id)
+        )
+        await self._session.execute(
+            delete(KnowledgeDocQuestionORM).where(KnowledgeDocQuestionORM.knowledge_base_id == kb_id)
+        )
+        await self._session.execute(
+            delete(KnowledgeChunkORM).where(KnowledgeChunkORM.knowledge_base_id == kb_id)
+        )
+        await self._session.execute(
+            delete(KnowledgeDocumentORM).where(KnowledgeDocumentORM.knowledge_base_id == kb_id)
+        )
+        await self._session.execute(
+            delete(QueryTermMappingORM).where(QueryTermMappingORM.knowledge_base_id == kb_id)
+        )
+        # Detach intent_nodes (nullable FK, not owned by KB)
+        await self._session.execute(
+            sa_update(IntentNodeORM)
+            .where(IntentNodeORM.knowledge_base_id == kb_id)
+            .values(knowledge_base_id=None)
+        )
         await self._session.execute(
             delete(KnowledgeBaseORM).where(KnowledgeBaseORM.id == kb_id)
         )
@@ -100,6 +125,9 @@ class KnowledgeRepo:
         doc = await self.get_document(doc_id)
         if not doc:
             return False
+        await self._session.execute(
+            delete(IngestionTaskORM).where(IngestionTaskORM.document_id == doc_id)
+        )
         await self._session.execute(
             delete(KnowledgeDocQuestionORM).where(KnowledgeDocQuestionORM.document_id == doc_id)
         )
