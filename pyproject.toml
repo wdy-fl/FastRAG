@@ -17,6 +17,8 @@ dependencies = [
     "tiktoken>=0.8",
     "aiobotocore>=2.15",
     "python-multipart>=0.0.20",
+    "rank-bm25>=0.2",
+    "jieba>=0.42",
 ]
 
 [dependency-groups]
