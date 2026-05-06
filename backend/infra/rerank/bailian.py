@@ -9,16 +9,18 @@ logger = logging.getLogger("backend.rag.rerank")
 class BailianRerankClient:
     _URL = "https://dashscope.aliyuncs.com/api/v1/services/rerank/text-rerank/text-rerank"
 
-    def __init__(self, api_key: str, model: str = "gte-rerank") -> None:
+    def __init__(self, api_key: str, model: str = "gte-rerank", top_n: int = 5) -> None:
         self._api_key = api_key
         self._model = model
+        self._top_n = top_n
 
     async def rerank(
         self,
         query: str,
         chunks: list[RetrievedChunk],
-        top_n: int = 5,
+        top_n: int | None = None,
     ) -> list[RetrievedChunk]:
+        top_n = top_n or self._top_n
         if not chunks:
             logger.debug("重排序 | 无chunks，跳过")
             return chunks

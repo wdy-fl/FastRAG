@@ -11,8 +11,7 @@ from backend.core.rag.retrieve import MultiChannelRetriever
 from backend.core.rag.prompt import PromptBuilder
 from backend.core.rag.term_mapper import QueryTermMapper
 from backend.core.rag.tracer import RagTracer
-from backend.core.rag.protocols import LLMProvider
-from backend.infra.rerank.bailian import BailianRerankClient
+from backend.core.rag.protocols import LLMProvider, Reranker
 
 logger = logging.getLogger("backend.rag.pipeline")
 
@@ -27,7 +26,7 @@ class RAGPipeline:
         retriever: MultiChannelRetriever,
         prompt_builder: PromptBuilder,
         tracer: RagTracer,
-        reranker: BailianRerankClient | None = None,
+        reranker: Reranker | None = None,
         term_mapper: QueryTermMapper | None = None,
         doc_repo: Any = None,
     ) -> None:

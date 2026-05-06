@@ -16,6 +16,7 @@ from backend.core.rag.rewrite import LLMQueryRewriter
 from backend.core.rag.intent import LLMIntentClassifier
 from backend.core.rag.retrieve import MultiChannelRetriever, VectorSearchChannel, QuestionSearchChannel
 from backend.infra.search.keyword import KeywordSearchChannel
+from backend.core.rag.protocols import Reranker
 from backend.infra.rerank.bailian import BailianRerankClient
 from backend.core.rag.prompt import PromptBuilder
 from backend.core.rag.pipeline import RAGPipeline
@@ -81,10 +82,10 @@ def get_redis_cache() -> RedisCache:
 
 
 @lru_cache
-def get_reranker() -> BailianRerankClient | None:
+def get_reranker() -> Reranker | None:
     s = get_settings()
     if s.rerank.api_key:
-        return BailianRerankClient(api_key=s.rerank.api_key, model=s.rerank.model)
+        return BailianRerankClient(api_key=s.rerank.api_key, model=s.rerank.model, top_n=s.rerank.top_n)
     return None
 
 

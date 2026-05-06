@@ -61,3 +61,13 @@ class QueryRewriter(Protocol):
 @runtime_checkable
 class IntentClassifier(Protocol):
     async def classify(self, query: str) -> IntentResult: ...
+
+
+@runtime_checkable
+class Reranker(Protocol):
+    async def rerank(
+        self,
+        query: str,
+        chunks: list[RetrievedChunk],
+        top_n: int | None = None,
+    ) -> list[RetrievedChunk]: ...

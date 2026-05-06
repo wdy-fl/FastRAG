@@ -6,7 +6,6 @@ from backend.core.models.chat import (
     ChatRequest, ConversationHistory, LLMEvent, GuidanceEvent, RetrievedChunk,
 )
 from backend.core.models.intent import IntentNode, IntentResult
-from backend.infra.rerank.bailian import BailianRerankClient
 
 
 def _make_stream(content: str):
@@ -151,15 +150,24 @@ async def test_pipeline_calls_reranker_when_provided():
         return_value=[RetrievedChunk(content="chunk", score=0.9)]
     )
 
-    mock_reranker = AsyncMock(spec=BailianRerankClient)
+    mock_reranker = AsyncMock()
     mock_reranker.rerank = AsyncMock(
         return_value=[RetrievedChunk(content="reranked chunk", score=0.95)]
+    )
+
+    mock_intent = AsyncMock()
+    mock_intent.classify = AsyncMock(
+        return_value=IntentResult(
+            matched_node=IntentNode(id="n1", name="test"),
+            confidence=0.9,
+        )
     )
 
     pipeline = _make_pipeline(
         llm=mock_llm,
         retriever=mock_retriever,
         reranker=mock_reranker,
+        intent_classifier=mock_intent,
     )
     events = []
     async for event in pipeline.chat(ChatRequest(query="test", conversation_id="c1")):
