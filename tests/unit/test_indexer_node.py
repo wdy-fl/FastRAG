@@ -26,7 +26,8 @@ def _make_context(chunks=None, questions=None):
 
 
 @pytest.mark.asyncio
-async def test_indexer_injects_keywords_str_into_metadata():
+async def test_indexer_does_not_inject_keywords_str():
+    """IndexerNode 不应再注入 _keywords_str 到 metadata。"""
     mock_llm = AsyncMock()
     mock_llm.embed = AsyncMock(return_value=[[0.1] * 1024])
     mock_store = AsyncMock()
@@ -38,7 +39,7 @@ async def test_indexer_injects_keywords_str_into_metadata():
 
     call_args = mock_store.upsert.call_args
     chunks_arg = call_args[0][0]
-    assert chunks_arg[0].chunk.metadata.get("_keywords_str") == "退款 政策 30日"
+    assert "_keywords_str" not in chunks_arg[0].chunk.metadata
 
 
 @pytest.mark.asyncio

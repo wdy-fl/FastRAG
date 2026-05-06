@@ -1,6 +1,6 @@
 from __future__ import annotations
 from uuid import uuid4
-from sqlalchemy import select, func
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 from backend.core.models.chat import RetrievedChunk
 from backend.core.models.knowledge import ChunkWithEmbedding
@@ -85,8 +85,7 @@ class PgVectorStore:
         document_id = metadata.get("document_id", "")
         async with self._session_factory() as session:
             for item in chunks:
-                chunk_meta = dict(item.chunk.metadata)  # 浅拷贝，隔离副作用
-                keywords_str: str = chunk_meta.pop("_keywords_str", "") or ""
+                chunk_meta = dict(item.chunk.metadata)
                 session.add(
                     KnowledgeChunkORM(
                         id=str(uuid4()),
@@ -96,7 +95,6 @@ class PgVectorStore:
                         chunk_index=item.chunk.chunk_index,
                         embedding=item.embedding,
                         metadata_=chunk_meta,
-                        keywords_tsv=func.to_tsvector('simple', keywords_str) if keywords_str else None,
                     )
                 )
             await session.commit()

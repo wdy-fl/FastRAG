@@ -33,12 +33,10 @@ class IndexerNode:
             texts = [c.content for c in batch]
             vectors = await self._llm.embed(texts)
             for chunk, vector in zip(batch, vectors):
-                keywords: list[str] = chunk.metadata.get("keywords", [])
-                enriched_metadata = {**chunk.metadata, "_keywords_str": " ".join(keywords)}
                 chunk_copy = DocumentChunk(
                     content=chunk.content,
                     chunk_index=chunk.chunk_index,
-                    metadata=enriched_metadata,
+                    metadata=chunk.metadata,
                 )
                 embedded.append(ChunkWithEmbedding(chunk=chunk_copy, embedding=vector))
 

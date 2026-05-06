@@ -62,7 +62,8 @@ async def test_upsert_calls_session_add():
 
 
 @pytest.mark.asyncio
-async def test_upsert_sets_keywords_tsv_from_metadata():
+async def test_upsert_ignores_keywords_tsv():
+    """upsert 不应再从 metadata 写入 keywords_tsv。"""
     mock_session = AsyncMock()
     mock_session_factory = MagicMock()
     mock_session_factory.return_value.__aenter__ = AsyncMock(return_value=mock_session)
@@ -74,7 +75,7 @@ async def test_upsert_sets_keywords_tsv_from_metadata():
             chunk=DocumentChunk(
                 content="text",
                 chunk_index=0,
-                metadata={"document_id": "doc-1", "_keywords_str": "退款 政策"},
+                metadata={"document_id": "doc-1"},
             ),
             embedding=[0.1] * 1024,
         )
@@ -82,9 +83,9 @@ async def test_upsert_sets_keywords_tsv_from_metadata():
     await store.upsert(chunks, metadata={"knowledge_base_id": "kb-1", "document_id": "doc-1"})
 
     added_orm = mock_session.add.call_args[0][0]
-    # keywords_tsv 应为 SQL 表达式（不是 None）
-    assert added_orm.keywords_tsv is not None
-    # _keywords_str 应从 metadata_ 中被移除
+    # keywords_tsv 应为 None（不再从 _keywords_str 生成）
+    assert added_orm.keywords_tsv is None
+    # metadata 中不应有 _keywords_str
     assert "_keywords_str" not in added_orm.metadata_
 
 
