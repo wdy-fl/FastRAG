@@ -62,34 +62,6 @@ async def test_upsert_calls_session_add():
 
 
 @pytest.mark.asyncio
-async def test_upsert_ignores_keywords_tsv():
-    """upsert 不应再从 metadata 写入 keywords_tsv。"""
-    mock_session = AsyncMock()
-    mock_session_factory = MagicMock()
-    mock_session_factory.return_value.__aenter__ = AsyncMock(return_value=mock_session)
-    mock_session_factory.return_value.__aexit__ = AsyncMock(return_value=False)
-
-    store = PgVectorStore(session_factory=mock_session_factory)
-    chunks = [
-        ChunkWithEmbedding(
-            chunk=DocumentChunk(
-                content="text",
-                chunk_index=0,
-                metadata={"document_id": "doc-1"},
-            ),
-            embedding=[0.1] * 1024,
-        )
-    ]
-    await store.upsert(chunks, metadata={"knowledge_base_id": "kb-1", "document_id": "doc-1"})
-
-    added_orm = mock_session.add.call_args[0][0]
-    # keywords_tsv 应为 None（不再从 _keywords_str 生成）
-    assert added_orm.keywords_tsv is None
-    # metadata 中不应有 _keywords_str
-    assert "_keywords_str" not in added_orm.metadata_
-
-
-@pytest.mark.asyncio
 async def test_search_questions_returns_chunks():
     mock_session = AsyncMock()
     mock_session_factory = MagicMock()

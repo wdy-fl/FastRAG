@@ -1,4 +1,5 @@
 from __future__ import annotations
+import logging
 from contextlib import asynccontextmanager
 from pathlib import Path
 from fastapi import FastAPI
@@ -8,11 +9,21 @@ from backend.api.routers import chat, conversation, knowledge, ingestion, intent
 from backend.config.logging import configure_logging
 from backend.config.settings import Settings
 
+logger = logging.getLogger("backend.main")
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Configure logging after uvicorn has finished its own log setup
     configure_logging(level=Settings().log_level)
+
+    # BM25 索引预构建
+    settings = Settings()
+    if settings.bm25.rebuild_on_startup:
+        from backend.api.deps import get_bm25_index_manager
+        manager = get_bm25_index_manager()
+        await manager.ensure_ready()
+        logger.info("BM25索引启动预构建完成")
 
     _tmp_dir = Path(__file__).parent / "temp"
     if _tmp_dir.exists():

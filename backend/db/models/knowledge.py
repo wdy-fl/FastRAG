@@ -1,8 +1,6 @@
 from __future__ import annotations
-from typing import Any
 from datetime import datetime
 from sqlalchemy import ForeignKey, JSON, String, Text, func
-from sqlalchemy.dialects.postgresql import TSVECTOR
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from pgvector.sqlalchemy import Vector
 from backend.db.models.base import Base
@@ -53,8 +51,6 @@ class KnowledgeChunkORM(Base):
     chunk_index: Mapped[int] = mapped_column()
     embedding: Mapped[list[float]] = mapped_column(Vector(_EMBEDDING_DIM))
     metadata_: Mapped[dict] = mapped_column("metadata", JSON, default={})
-    # TSVECTOR has no Python-side scalar type; populated via SQL expression in upsert
-    keywords_tsv: Mapped[Any | None] = mapped_column(TSVECTOR, nullable=True)
     created_at: Mapped[datetime] = mapped_column(server_default=func.now())
 
 
