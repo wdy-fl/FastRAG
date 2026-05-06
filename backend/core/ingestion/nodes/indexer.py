@@ -6,6 +6,7 @@ from backend.core.models.knowledge import ChunkWithEmbedding, DocumentChunk
 from backend.core.rag.protocols import LLMProvider, VectorStore
 from backend.core.exceptions import IngestionError
 from backend.db.models.knowledge import KnowledgeDocQuestionORM
+from backend.infra.search.bm25_index import Bm25IndexManager
 
 
 class IndexerNode:
@@ -16,10 +17,12 @@ class IndexerNode:
         llm: LLMProvider,
         vector_store: VectorStore,
         session_factory: async_sessionmaker[AsyncSession] | None = None,
+        bm25_manager: Bm25IndexManager | None = None,
     ) -> None:
         self._llm = llm
         self._vector_store = vector_store
         self._session_factory = session_factory
+        self._bm25_manager = bm25_manager
 
     async def execute(
         self, context: IngestionContext, config: IndexerSettings
@@ -45,6 +48,10 @@ class IndexerNode:
 
         if context.questions and self._session_factory:
             await self._persist_questions(context)
+
+        # 入库完成后标记 BM25 索引为脏
+        if self._bm25_manager is not None:
+            self._bm25_manager.mark_dirty()
 
         return context
 

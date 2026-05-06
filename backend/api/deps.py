@@ -83,6 +83,11 @@ def get_redis_cache() -> RedisCache:
 
 
 @lru_cache
+def get_bm25_index_manager() -> Bm25IndexManager:
+    return Bm25IndexManager(session_factory=get_session_factory())
+
+
+@lru_cache
 def get_reranker() -> Reranker | None:
     s = get_settings()
     if s.rerank.api_key:
@@ -157,7 +162,7 @@ def get_rag_pipeline(
             channels=[
                 VectorSearchChannel(vector_store=get_vector_store(), llm=embedding_llm),
                 QuestionSearchChannel(vector_store=get_vector_store(), llm=embedding_llm),
-                Bm25KeywordChannel(bm25_manager=Bm25IndexManager(session_factory=session_factory)),
+                Bm25KeywordChannel(bm25_manager=get_bm25_index_manager()),
             ],
             llm=embedding_llm,
             chat_llm=llm,
@@ -203,6 +208,7 @@ def get_ingestion_engine() -> IngestionEngine:
                 llm=get_embedding_provider(),
                 vector_store=get_vector_store(),
                 session_factory=get_session_factory(),
+                bm25_manager=get_bm25_index_manager(),
             ),
         }
     )

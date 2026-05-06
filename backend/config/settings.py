@@ -19,6 +19,10 @@ class IngestionSettings(BaseModel):
     task_timeout_seconds: int = 600  # 默认 10 分钟
 
 
+class Bm25Settings(BaseModel):
+    rebuild_on_startup: bool = True  # 启动时全量构建
+
+
 class RerankSettings(BaseModel):
     api_key: str | None = None
     model: str = "gte-rerank"
@@ -33,6 +37,7 @@ class Settings(BaseSettings):
     embedding: EmbeddingSettings = EmbeddingSettings()
     ingestion: IngestionSettings = IngestionSettings()
     rerank: RerankSettings = RerankSettings()
+    bm25: Bm25Settings = Bm25Settings()
     rag_window_size: int = 4
     rag_summary_threshold: int = 5
     rag_retrieval_top_k: int = 10
