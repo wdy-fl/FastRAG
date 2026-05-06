@@ -6,6 +6,8 @@ from typing import AsyncIterator
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
+import logging
+
 from backend.api.deps import get_rag_pipeline, get_llm_provider, get_conversation_repo, get_redis_cache
 from backend.infra.cache.redis import RedisCache
 from backend.core.models.chat import ChatRequest, LLMEvent, GuidanceEvent, MetaEvent, SourcesEvent
@@ -14,6 +16,7 @@ from backend.db.repos.conversation import ConversationRepo
 from backend.infra.llm.client import OpenAICompatClient
 
 router = APIRouter()
+logger = logging.getLogger("backend.api.chat")
 
 # 进程内 task 注册表：task_id -> asyncio.Task
 _task_registry: dict[str, asyncio.Task] = {}  # type: ignore[type-arg]
@@ -63,6 +66,7 @@ async def _event_stream(
 
 async def _generate_title(query: str, llm: OpenAICompatClient) -> str:
     """用 LLM 为会话生成 10 字以内的标题，失败时降级。"""
+    logger.debug("生成会话标题 | query=%r", query)
     try:
         messages = [
             {
@@ -75,8 +79,10 @@ async def _generate_title(query: str, llm: OpenAICompatClient) -> str:
             if event.type == "content":
                 title_parts.append(event.content)
         title = "".join(title_parts).strip()
+        logger.info("会话标题生成完成 | title=%r", title)
         return title if title else query[:30]
     except Exception:
+        logger.warning("会话标题生成失败，降级为截断query", exc_info=True)
         return query[:30]
 
 

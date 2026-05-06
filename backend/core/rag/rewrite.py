@@ -6,8 +6,12 @@ from backend.core.rag.protocols import LLMProvider
 logger = logging.getLogger("backend.rag.rewrite")
 
 _REWRITE_PROMPT = (
-    "You are a query optimizer. Given the conversation history and the current query, "
-    "rewrite the query to be more specific and self-contained. "
+    "You are a query rewriter. Rewrite the query to resolve ambiguities and fill missing context "
+    "from conversation history. Rules:\n"
+    "- ONLY use information explicitly stated in the query or history\n"
+    "- DO NOT add conditions, assumptions, or legal terms not mentioned by the user\n"
+    "- Fix grammar, resolve pronouns, and clarify ambiguous references\n"
+    "- If there is no history or ambiguity, return the original query unchanged\n"
     "Return only the rewritten query, no explanations.\n"
     "Conversation history: {history}\nCurrent query: {query}"
 )
