@@ -9,11 +9,7 @@ class IntentNodeORM(Base):
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True)
     name: Mapped[str] = mapped_column(String(100))
-    level: Mapped[str] = mapped_column(String(20))
-    parent_id: Mapped[str | None] = mapped_column(
-        ForeignKey("intent_nodes.id"), nullable=True
-    )
-    intent_type: Mapped[str] = mapped_column(String(10), default="system")
+    intent_type: Mapped[str] = mapped_column(String(10), default="kb")
     knowledge_base_id: Mapped[str | None] = mapped_column(
         ForeignKey("knowledge_bases.id"), nullable=True
     )

@@ -6,9 +6,7 @@ from pydantic import BaseModel
 class IntentNode(BaseModel):
     id: str
     name: str
-    level: Literal["domain", "category", "topic"]
-    parent_id: str | None = None
-    intent_type: Literal["kb", "mcp", "system"] = "system"
+    intent_type: Literal["kb", "mcp", "system"] = "kb"
     knowledge_base_id: str | None = None
     keywords: list[str] = []
     description: str = ""

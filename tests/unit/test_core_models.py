@@ -16,8 +16,8 @@ from backend.core.models.ingestion import (
 
 
 def test_intent_node():
-    node = IntentNode(id="n1", name="Finance", level="domain")
-    assert node.intent_type == "system"
+    node = IntentNode(id="n1", name="Finance")
+    assert node.intent_type == "kb"
     assert node.keywords == []
 
 
@@ -135,20 +135,20 @@ def test_title_only_on_done_raises():
 
 def test_intent_node_has_knowledge_base_id():
     from backend.core.models.intent import IntentNode
-    node = IntentNode(id="n1", name="test", level="domain", knowledge_base_id="kb-1")
+    node = IntentNode(id="n1", name="test", knowledge_base_id="kb-1")
     assert node.knowledge_base_id == "kb-1"
 
 def test_intent_node_knowledge_base_id_defaults_none():
     from backend.core.models.intent import IntentNode
-    node = IntentNode(id="n1", name="test", level="domain")
+    node = IntentNode(id="n1", name="test")
     assert node.knowledge_base_id is None
 
 def test_intent_node_intent_type_includes_system():
     from backend.core.models.intent import IntentNode
-    node = IntentNode(id="n1", name="chitchat", level="domain", intent_type="system")
+    node = IntentNode(id="n1", name="chitchat", intent_type="system")
     assert node.intent_type == "system"
 
-def test_intent_node_intent_type_defaults_system():
+def test_intent_node_intent_type_defaults_kb():
     from backend.core.models.intent import IntentNode
-    node = IntentNode(id="n1", name="test", level="domain")
-    assert node.intent_type == "system"
+    node = IntentNode(id="n1", name="test")
+    assert node.intent_type == "kb"

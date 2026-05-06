@@ -10,8 +10,6 @@ router = APIRouter()
 class IntentNodeResponse(BaseModel):
     id: str
     name: str
-    level: str
-    parent_id: str | None
     intent_type: str
     knowledge_base_id: str | None
     keywords: list
@@ -20,9 +18,7 @@ class IntentNodeResponse(BaseModel):
 
 class CreateIntentNodeRequest(BaseModel):
     name: str
-    level: str
-    parent_id: str | None = None
-    intent_type: str = "system"
+    intent_type: str = "kb"
     keywords: list[str] = []
     description: str = ""
     knowledge_base_id: str | None = None
@@ -30,8 +26,6 @@ class CreateIntentNodeRequest(BaseModel):
 
 class UpdateIntentNodeRequest(BaseModel):
     name: str | None = None
-    level: str | None = None
-    parent_id: str | None = None
     intent_type: str | None = None
     keywords: list[str] | None = None
     description: str | None = None
@@ -40,7 +34,7 @@ class UpdateIntentNodeRequest(BaseModel):
 
 def _orm_to_response(n) -> IntentNodeResponse:
     return IntentNodeResponse(
-        id=n.id, name=n.name, level=n.level, parent_id=n.parent_id,
+        id=n.id, name=n.name,
         intent_type=n.intent_type, knowledge_base_id=n.knowledge_base_id,
         keywords=n.keywords, description=n.description,
     )
@@ -79,4 +73,4 @@ async def delete_intent_node(
     node_id: str,
     repo: IntentRepo = Depends(get_intent_repo),
 ) -> None:
-    await repo.delete_intent_node_cascade(node_id)
+    await repo.delete_intent_node(node_id)

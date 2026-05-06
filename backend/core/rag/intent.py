@@ -46,7 +46,7 @@ class LLMIntentClassifier:
             orm_nodes = await self._repo.list_intent_nodes()
             nodes = [
                 IntentNode(
-                    id=n.id, name=n.name, level=n.level, parent_id=n.parent_id,
+                    id=n.id, name=n.name,
                     intent_type=n.intent_type, keywords=n.keywords or [],
                     description=n.description or "",
                     knowledge_base_id=n.knowledge_base_id,
@@ -72,7 +72,7 @@ class LLMIntentClassifier:
             return IntentResult(needs_guidance=False, confidence=1.0)
 
         nodes_text = "\n".join(
-            f"- id={n.id} name={n.name} level={n.level} keywords={n.keywords}"
+            f"- id={n.id} name={n.name} keywords={n.keywords} description={n.description}"
             for n in nodes
         )
         prompt = _CLASSIFY_PROMPT.format(nodes=nodes_text or "none", query=query)
@@ -94,6 +94,17 @@ class LLMIntentClassifier:
         matched_id = data.get("matched_id")
         nodes_by_id = {n.id: n for n in nodes}
         matched_node = nodes_by_id.get(matched_id) if matched_id else None
+
+        if matched_id is None:
+            logger.info(
+                "意图分类 | 无匹配节点 → system回退 | query=%r | confidence=%.2f",
+                query, confidence,
+            )
+            return IntentResult(
+                matched_node=None,
+                confidence=confidence,
+                needs_guidance=False,
+            )
 
         if confidence < self._threshold:
             logger.info(

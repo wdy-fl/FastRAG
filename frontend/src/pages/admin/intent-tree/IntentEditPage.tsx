@@ -10,15 +10,15 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { intentTreeService } from "@/services/intentTreeService";
-import type { IntentNode } from "@/types";
+import { knowledgeService } from "@/services/knowledgeService";
+import type { IntentNode, KnowledgeBase } from "@/types";
 import { getErrorMessage } from "@/utils/error";
 
 const formSchema = z.object({
   name: z.string().min(1, "请输入节点名称").max(100, "名称不能超过100个字符"),
-  level: z.number().int().min(0, "层级不能为负数"),
-  parent_id: z.string().optional(),
-  intent_type: z.string().min(1, "请输入意图类型"),
+  knowledge_base_id: z.string().min(1, "请选择知识库"),
   keywords: z.string().optional(),
   description: z.string().optional()
 });
@@ -27,18 +27,14 @@ type FormValues = z.infer<typeof formSchema>;
 
 const emptyDefaults: FormValues = {
   name: "",
-  level: 0,
-  parent_id: "",
-  intent_type: "classify",
+  knowledge_base_id: "",
   keywords: "",
   description: ""
 };
 
 const nodeToFormValues = (node: IntentNode): FormValues => ({
   name: node.name || "",
-  level: node.level ?? 0,
-  parent_id: node.parent_id || "",
-  intent_type: node.intent_type || "classify",
+  knowledge_base_id: node.knowledge_base_id || "",
   keywords: (node.keywords || []).join(", "),
   description: node.description || ""
 });
@@ -49,6 +45,7 @@ export function IntentEditPage() {
   const [searchParams] = useSearchParams();
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [kbs, setKbs] = useState<KnowledgeBase[]>([]);
   const isEdit = Boolean(routeId && routeId !== "new");
 
   const returnTo = useMemo(() => {
@@ -63,6 +60,19 @@ export function IntentEditPage() {
     resolver: zodResolver(formSchema),
     defaultValues: emptyDefaults
   });
+
+  useEffect(() => {
+    const fetchKbs = async () => {
+      try {
+        const res = await knowledgeService.listKnowledgeBases();
+        setKbs(res.data || []);
+      } catch (error) {
+        toast.error(getErrorMessage(error, "加载知识库列表失败"));
+        console.error(error);
+      }
+    };
+    fetchKbs();
+  }, []);
 
   useEffect(() => {
     if (!isEdit || !routeId) return;
@@ -97,9 +107,7 @@ export function IntentEditPage() {
 
     const payload = {
       name: values.name.trim(),
-      level: values.level,
-      parent_id: values.parent_id?.trim() || null,
-      intent_type: values.intent_type.trim(),
+      knowledge_base_id: values.knowledge_base_id.trim(),
       keywords,
       description: values.description?.trim() || ""
     };
@@ -173,52 +181,24 @@ export function IntentEditPage() {
 
                 <FormField
                   control={form.control}
-                  name="level"
+                  name="knowledge_base_id"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>层级</FormLabel>
-                      <FormControl>
-                        <Input
-                          type="number"
-                          min={0}
-                          placeholder="例如：0"
-                          value={field.value ?? ""}
-                          onChange={(event) => {
-                            const value = event.target.value;
-                            field.onChange(value === "" ? 0 : Number(value));
-                          }}
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              </div>
-
-              <div className="grid gap-4 md:grid-cols-2">
-                <FormField
-                  control={form.control}
-                  name="intent_type"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>意图类型</FormLabel>
-                      <FormControl>
-                        <Input placeholder="例如：classify" {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                <FormField
-                  control={form.control}
-                  name="parent_id"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>父节点 ID（可选）</FormLabel>
-                      <FormControl>
-                        <Input placeholder="留空表示根节点" {...field} />
-                      </FormControl>
+                      <FormLabel>知识库</FormLabel>
+                      <Select value={field.value} onValueChange={field.onChange}>
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder="请选择知识库" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          {kbs.map((kb) => (
+                            <SelectItem key={kb.id} value={kb.id}>
+                              {kb.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
                       <FormMessage />
                     </FormItem>
                   )}

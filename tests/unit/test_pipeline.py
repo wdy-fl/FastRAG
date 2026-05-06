@@ -190,12 +190,11 @@ async def test_pipeline_skips_reranker_when_none():
 
 
 @pytest.mark.asyncio
-async def test_pipeline_fast_path_on_system_intent():
-    """All sub-queries matched system intent → skip retrieval, direct LLM answer."""
-    system_node = IntentNode(id="s1", name="Chat", level="domain", intent_type="system")
+async def test_pipeline_fast_path_on_no_intent_match():
+    """All sub-queries have no matched node → skip retrieval, direct LLM answer (system fallback)."""
     mock_intent = AsyncMock()
     mock_intent.classify = AsyncMock(
-        return_value=IntentResult(matched_node=system_node, confidence=0.9)
+        return_value=IntentResult(matched_node=None, confidence=0.2)
     )
 
     mock_retriever = AsyncMock()

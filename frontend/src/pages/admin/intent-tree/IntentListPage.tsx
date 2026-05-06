@@ -3,7 +3,6 @@ import { useNavigate } from "react-router-dom";
 import { Pencil, RefreshCw, Search, Trash2, X } from "lucide-react";
 import { toast } from "sonner";
 
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -35,34 +34,24 @@ import {
 } from "@/components/ui/table";
 import { cn } from "@/lib/utils";
 import { intentTreeService } from "@/services/intentTreeService";
-import type { IntentNode } from "@/types";
+import { knowledgeService } from "@/services/knowledgeService";
+import type { IntentNode, KnowledgeBase } from "@/types";
 import { getErrorMessage } from "@/utils/error";
 
-const ALL_VALUE = "__ALL__";
 const PAGE_SIZE_OPTIONS = [10, 20, 50];
 
-const FILTER_SELECT_TRIGGER_CLASS =
-  "h-10 text-sm border-slate-200 focus:ring-0 focus:ring-offset-0 focus-visible:ring-0 focus-visible:ring-offset-0 data-[state=open]:border-slate-200 data-[state=open]:ring-0";
 const FILTER_INPUT_CLASS =
   "h-10 border-slate-200 pl-10 text-sm focus-visible:ring-0 focus-visible:ring-offset-0 focus-visible:border-slate-200";
-
-const resolveLevelBadgeClass = (value: number) => {
-  if (value === 0) return "border-[#91d5ff] bg-[#e6f7ff] text-[#1890FF]";
-  if (value === 1) return "border-[#b7eb8f] bg-[#f6ffed] text-[#52C41A]";
-  if (value === 2) return "border-[#ffd591] bg-[#fff7e6] text-[#FA8C16]";
-  return "border-slate-200 bg-slate-50 text-slate-600";
-};
 
 export function IntentListPage() {
   const navigate = useNavigate();
   const [nodes, setNodes] = useState<IntentNode[]>([]);
   const [loading, setLoading] = useState(true);
-  const [levelFilter, setLevelFilter] = useState(ALL_VALUE);
-  const [intentTypeFilter, setIntentTypeFilter] = useState(ALL_VALUE);
   const [keyword, setKeyword] = useState("");
   const [pageNo, setPageNo] = useState(1);
   const [pageSize, setPageSize] = useState(PAGE_SIZE_OPTIONS[0]);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [kbs, setKbs] = useState<KnowledgeBase[]>([]);
 
   const loadNodes = async () => {
     try {
@@ -79,36 +68,28 @@ export function IntentListPage() {
 
   useEffect(() => {
     loadNodes();
+    knowledgeService.listKnowledgeBases()
+      .then((res) => setKbs(res.data || []))
+      .catch((error) => {
+        toast.error(getErrorMessage(error, "加载知识库列表失败"));
+        console.error(error);
+      });
   }, []);
-
-  const intentTypeOptions = useMemo(() => {
-    const types = Array.from(new Set(nodes.map((n) => n.intent_type).filter(Boolean)));
-    return types;
-  }, [nodes]);
 
   const filteredNodes = useMemo(() => {
     const normalizedKeyword = keyword.trim().toLowerCase();
     return nodes.filter((node) => {
       if (normalizedKeyword) {
-        const searchable = [node.name, node.intent_type, node.id, (node.keywords || []).join(" ")]
+        const searchable = [node.name, node.id, (node.keywords || []).join(" ")]
           .join(" ")
           .toLowerCase();
         if (!searchable.includes(normalizedKeyword)) {
           return false;
         }
       }
-
-      if (levelFilter !== ALL_VALUE && node.level !== Number(levelFilter)) {
-        return false;
-      }
-
-      if (intentTypeFilter !== ALL_VALUE && node.intent_type !== intentTypeFilter) {
-        return false;
-      }
-
       return true;
     });
-  }, [nodes, keyword, levelFilter, intentTypeFilter]);
+  }, [nodes, keyword]);
 
   const total = filteredNodes.length;
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
@@ -124,8 +105,6 @@ export function IntentListPage() {
 
   const handleResetFilters = () => {
     setKeyword("");
-    setLevelFilter(ALL_VALUE);
-    setIntentTypeFilter(ALL_VALUE);
     setPageNo(1);
   };
 
@@ -157,7 +136,7 @@ export function IntentListPage() {
         <div className="admin-page-actions">
           <Button
             className="admin-primary-gradient"
-            onClick={() => navigate("/admin/intent-list/new")}
+            onClick={() => navigate("/admin/intent-list/new/edit")}
           >
             新增意图节点
           </Button>
@@ -182,45 +161,6 @@ export function IntentListPage() {
             </div>
 
             <div className="flex flex-wrap items-center gap-2">
-              <Select
-                value={levelFilter}
-                onValueChange={(value) => {
-                  setLevelFilter(value);
-                  setPageNo(1);
-                }}
-              >
-                <SelectTrigger aria-label="层级筛选" className={cn("w-[136px]", FILTER_SELECT_TRIGGER_CLASS)}>
-                  <SelectValue placeholder="层级" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value={ALL_VALUE}>全部层级</SelectItem>
-                  <SelectItem value="0">0</SelectItem>
-                  <SelectItem value="1">1</SelectItem>
-                  <SelectItem value="2">2</SelectItem>
-                  <SelectItem value="3">3</SelectItem>
-                </SelectContent>
-              </Select>
-
-              <Select
-                value={intentTypeFilter}
-                onValueChange={(value) => {
-                  setIntentTypeFilter(value);
-                  setPageNo(1);
-                }}
-              >
-                <SelectTrigger aria-label="意图类型筛选" className={cn("w-[160px]", FILTER_SELECT_TRIGGER_CLASS)}>
-                  <SelectValue placeholder="意图类型" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value={ALL_VALUE}>全部类型</SelectItem>
-                  {intentTypeOptions.map((type) => (
-                    <SelectItem key={type} value={type}>
-                      {type}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-
               <Button
                 variant="outline"
                 className="h-10 gap-1.5 border-slate-200 px-3 text-sm"
@@ -254,13 +194,11 @@ export function IntentListPage() {
                 : "没有匹配结果，请调整筛选条件"}
             </div>
           ) : (
-            <Table className="min-w-[900px] [&_th]:h-10 [&_th]:py-2 [&_td]:py-2">
+            <Table className="min-w-[700px] [&_th]:h-10 [&_th]:py-2 [&_td]:py-2">
               <TableHeader>
                 <TableRow>
                   <TableHead className="w-[220px]">名称</TableHead>
-                  <TableHead className="w-[80px]">层级</TableHead>
-                  <TableHead className="w-[140px]">意图类型</TableHead>
-                  <TableHead className="w-[260px]">父节点 ID</TableHead>
+                  <TableHead className="w-[160px]">知识库</TableHead>
                   <TableHead>关键词</TableHead>
                   <TableHead className="sticky right-0 z-20 w-[140px] bg-[#F9FAFB] text-left shadow-[-1px_0_0_rgba(226,232,240,1)]">
                     操作
@@ -277,18 +215,10 @@ export function IntentListPage() {
                       </div>
                     </TableCell>
                     <TableCell>
-                      <Badge variant="outline" className={cn("font-medium", resolveLevelBadgeClass(node.level))}>
-                        {node.level}
-                      </Badge>
-                    </TableCell>
-                    <TableCell>
-                      <span className="rounded-md border border-slate-200 bg-slate-50 px-2 py-0.5 text-xs text-slate-700">
-                        {node.intent_type || "-"}
-                      </span>
-                    </TableCell>
-                    <TableCell>
-                      <span className="font-mono text-xs text-slate-500">
-                        {node.parent_id || <span className="text-slate-300">（根节点）</span>}
+                      <span className="text-sm text-slate-600">
+                        {node.knowledge_base_id
+                          ? (kbs.find((kb) => kb.id === node.knowledge_base_id)?.name ?? node.knowledge_base_id)
+                          : <span className="text-slate-300">-</span>}
                       </span>
                     </TableCell>
                     <TableCell>

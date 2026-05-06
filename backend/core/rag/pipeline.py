@@ -120,12 +120,9 @@ class RAGPipeline:
                     yield GuidanceEvent(intent=intent)
                     return
 
-            # SYSTEM fast-path: all sub-queries matched system intent → skip retrieval
-            if all(
-                ir.matched_node and ir.matched_node.intent_type == "system"
-                for ir in intents
-            ):
-                logger.info("[RAG] ⑥ 全system意图，跳过检索，直接生成")
+            # SYSTEM fast-path: no intent matched → skip retrieval (system fallback)
+            if all(ir.matched_node is None for ir in intents):
+                logger.info("[RAG] ⑥ 无匹配意图节点，跳过检索，直接生成(system回退)")
                 prompt = self._prompt_builder.build(
                     request.query, history, [], list(intents)
                 )

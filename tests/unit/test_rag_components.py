@@ -55,16 +55,29 @@ async def test_classifier_returns_intent_result():
 
 
 @pytest.mark.asyncio
-async def test_classifier_low_confidence_needs_guidance():
+async def test_classifier_matched_but_low_confidence_needs_guidance():
+    mock_llm = MagicMock()
+    mock_llm.stream = MagicMock(
+        side_effect=lambda msgs, **kw: _make_stream('{"confidence": 0.3, "matched_id": "n1"}')
+    )
+    # 需要提供至少一个节点，否则 classifier 直接跳过不走 LLM
+    dummy_node = IntentNode(id="n1", name="General")
+    classifier = LLMIntentClassifier(llm=mock_llm, intent_nodes=[dummy_node], confidence_threshold=0.6)
+    result = await classifier.classify("ambiguous question")
+    assert result.needs_guidance is True
+
+
+@pytest.mark.asyncio
+async def test_classifier_no_match_returns_system_fallback():
     mock_llm = MagicMock()
     mock_llm.stream = MagicMock(
         side_effect=lambda msgs, **kw: _make_stream('{"confidence": 0.3, "matched_id": null}')
     )
-    # 需要提供至少一个节点，否则 classifier 直接跳过不走 LLM
-    dummy_node = IntentNode(id="n1", name="General", level="domain")
+    dummy_node = IntentNode(id="n1", name="General")
     classifier = LLMIntentClassifier(llm=mock_llm, intent_nodes=[dummy_node], confidence_threshold=0.6)
-    result = await classifier.classify("ambiguous question")
-    assert result.needs_guidance is True
+    result = await classifier.classify("unrelated question")
+    assert result.needs_guidance is False
+    assert result.matched_node is None
 
 
 @pytest.mark.asyncio
@@ -175,15 +188,13 @@ async def test_classifier_loads_nodes_from_repo():
         side_effect=lambda msgs, **kw: _make_stream('{"confidence": 0.9, "matched_id": "n1"}')
     )
     orm_node = MagicMock(
-        id="n1", name="Finance", level="domain", parent_id=None,
+        id="n1", name="Finance",
         intent_type="kb", keywords=["finance"], description="",
         knowledge_base_id="kb-1",
     )
     # Ensure attributes return actual values, not MagicMock objects
     orm_node.id = "n1"
     orm_node.name = "Finance"
-    orm_node.level = "domain"
-    orm_node.parent_id = None
     orm_node.intent_type = "kb"
     orm_node.keywords = ["finance"]
     orm_node.description = ""
@@ -228,7 +239,7 @@ async def test_classifier_reads_from_redis_cache():
     mock_llm = MagicMock()
     mock_repo = AsyncMock()
     cached_json = json.dumps([IntentNode(
-        id="n1", name="test", level="domain", intent_type="kb",
+        id="n1", name="test", intent_type="kb",
         knowledge_base_id="kb-1",
     ).model_dump_json()])
     mock_cache = AsyncMock()
@@ -261,7 +272,7 @@ async def test_vector_channel_routes_to_specific_kb():
     mock_store = AsyncMock()
     mock_store.search = AsyncMock(return_value=[])
     channel = VectorSearchChannel(vector_store=mock_store, llm=AsyncMock())
-    node = IntentNode(id="n1", name="Finance", level="domain", intent_type="kb", knowledge_base_id="kb-1")
+    node = IntentNode(id="n1", name="Finance", intent_type="kb", knowledge_base_id="kb-1")
     intent = IntentResult(matched_node=node, confidence=0.9)
     await channel.search("query", intent, top_k=5, query_vector=[0.1] * 10)
     mock_store.search.assert_awaited_once_with(
@@ -274,7 +285,7 @@ async def test_vector_channel_no_route_for_system_intent():
     mock_store = AsyncMock()
     mock_store.search = AsyncMock(return_value=[])
     channel = VectorSearchChannel(vector_store=mock_store, llm=AsyncMock())
-    node = IntentNode(id="n1", name="Chat", level="domain", intent_type="system")
+    node = IntentNode(id="n1", name="Chat", intent_type="system")
     intent = IntentResult(matched_node=node, confidence=0.9)
     await channel.search("query", intent, top_k=5, query_vector=[0.1] * 10)
     mock_store.search.assert_awaited_once_with(

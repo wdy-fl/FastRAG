@@ -130,9 +130,7 @@ export interface TraceRunDetail extends TraceRun {
 export interface IntentNode {
   id: string;
   name: string;
-  level: number;
-  parent_id: string | null;
-  intent_type: string;
+  knowledge_base_id: string | null;
   keywords: string[];
   description: string;
 }

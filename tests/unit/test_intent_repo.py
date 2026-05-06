@@ -23,20 +23,19 @@ def mock_cache():
 async def test_create_invalidates_cache(mock_session, mock_cache):
     repo = IntentRepo(session=mock_session, cache=mock_cache)
     mock_session.refresh = AsyncMock(return_value=MagicMock(
-        id="n1", name="test", level="domain", parent_id=None,
+        id="n1", name="test",
         intent_type="kb", keywords=[], description="", knowledge_base_id=None,
     ))
     await repo.create_intent_node(
-        name="test", level="domain", parent_id=None,
-        intent_type="kb", keywords=[], description="",
+        name="test", intent_type="kb", keywords=[], description="",
     )
     mock_cache.delete.assert_awaited_once_with("intent:nodes")
 
 
 @pytest.mark.asyncio
-async def test_delete_cascade_invalidates_cache(mock_session, mock_cache):
+async def test_delete_invalidates_cache(mock_session, mock_cache):
     repo = IntentRepo(session=mock_session, cache=mock_cache)
-    await repo.delete_intent_node_cascade("node-1")
+    await repo.delete_intent_node("node-1")
     mock_cache.delete.assert_awaited_once_with("intent:nodes")
 
 
@@ -47,7 +46,7 @@ async def test_update_invalidates_cache(mock_session, mock_cache):
     mock_orm.id = "n1"
     mock_session.get = AsyncMock(return_value=mock_orm)
     mock_session.refresh = AsyncMock(return_value=MagicMock(
-        id="n1", name="updated", level="domain", parent_id=None,
+        id="n1", name="updated",
         intent_type="kb", keywords=[], description="", knowledge_base_id="kb-1",
     ))
     await repo.update_intent_node("n1", name="updated")
@@ -58,12 +57,11 @@ async def test_update_invalidates_cache(mock_session, mock_cache):
 async def test_no_cache_no_invalidation(mock_session):
     repo = IntentRepo(session=mock_session, cache=None)
     mock_session.refresh = AsyncMock(return_value=MagicMock(
-        id="n1", name="test", level="domain", parent_id=None,
+        id="n1", name="test",
         intent_type="kb", keywords=[], description="", knowledge_base_id=None,
     ))
     await repo.create_intent_node(
-        name="test", level="domain", parent_id=None,
-        intent_type="kb", keywords=[], description="",
+        name="test", intent_type="kb", keywords=[], description="",
     )
     # 不应抛异常
 
