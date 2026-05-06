@@ -6,14 +6,13 @@ from backend.core.rag.protocols import LLMProvider
 logger = logging.getLogger("backend.rag.rewrite")
 
 _REWRITE_PROMPT = (
-    "You are a query rewriter. Rewrite the query to resolve ambiguities and fill missing context "
-    "from conversation history. Rules:\n"
-    "- ONLY use information explicitly stated in the query or history\n"
-    "- DO NOT add conditions, assumptions, or legal terms not mentioned by the user\n"
-    "- Fix grammar, resolve pronouns, and clarify ambiguous references\n"
-    "- If there is no history or ambiguity, return the original query unchanged\n"
-    "Return only the rewritten query, no explanations.\n"
-    "Conversation history: {history}\nCurrent query: {query}"
+    "你是一个查询改写器。你的唯一任务是改写查询，使其更清晰、更完整。严格规则：\n"
+    "- 只做改写，绝对不要回答或回应查询的内容\n"
+    "- 只使用查询或历史中明确提到的信息\n"
+    "- 修正语法、解析代词、澄清模糊引用\n"
+    "- 如果没有历史记录或歧义，原样返回查询，不做任何修改\n"
+    "只返回改写后的查询，不要解释。\n"
+    "对话历史: {history}\n当前查询: {query}"
 )
 
 _SPLIT_PROMPT = (
