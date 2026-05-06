@@ -1,6 +1,5 @@
 from __future__ import annotations
 import logging
-import threading
 from dataclasses import dataclass
 from typing import Any
 import jieba
@@ -41,7 +40,6 @@ class Bm25IndexManager:
         self._kb_indexes: dict[str, _Bm25Corpus] = {}
         self._global_index: _Bm25Corpus | None = None
         self._dirty = True
-        self._lock = threading.Lock()
 
     @property
     def is_dirty(self) -> bool:
@@ -83,10 +81,9 @@ class Bm25IndexManager:
 
         new_global = self._build_corpus(all_items) if all_items else None
 
-        with self._lock:
-            self._kb_indexes = new_kb_indexes
-            self._global_index = new_global
-            self._dirty = False
+        self._kb_indexes = new_kb_indexes
+        self._global_index = new_global
+        self._dirty = False
 
         logger.info(
             "BM25索引构建完成 | kb_count=%d | total_chunks=%d",
@@ -131,10 +128,9 @@ class Bm25IndexManager:
         ]
 
     def _get_corpus(self, kb_id: str | None) -> _Bm25Corpus | None:
-        with self._lock:
-            if kb_id is not None:
-                return self._kb_indexes.get(kb_id)
-            return self._global_index
+        if kb_id is not None:
+            return self._kb_indexes.get(kb_id)
+        return self._global_index
 
     @staticmethod
     def _build_corpus(items: list[_CorpusItem]) -> _Bm25Corpus:
