@@ -1,5 +1,4 @@
 from __future__ import annotations
-import asyncio
 import logging
 import time
 from typing import Any, AsyncIterator
@@ -88,42 +87,28 @@ class RAGPipeline:
                 (time.monotonic() - t0) * 1000, expanded_query, rewritten,
             )
 
-            # ── Step 4: 查询拆分 ──
+            # ── Step 4: 意图分类 ──
             t0 = time.monotonic()
-            sub_queries = await self._tracer.trace_node("query_split")(
-                self._rewriter.split
+            intent = await self._tracer.trace_node("intent_classify")(
+                self._intent_classifier.classify
             )(rewritten)
             logger.info(
-                "[RAG] ④ 查询拆分 | %.1fms | count=%d | sub_queries=%s",
+                "[RAG] ④ 意图分类 | %.1fms | guidance=%s matches=%s",
                 (time.monotonic() - t0) * 1000,
-                len(sub_queries), sub_queries,
+                intent.needs_guidance,
+                [(m.node.name, m.confidence) for m in intent.matches],
             )
 
-            # ── Step 5: 意图分类 ──
-            t0 = time.monotonic()
-            intents = await asyncio.gather(
-                *[self._intent_classifier.classify(q) for q in sub_queries]
-            )
-            intent_summary = [
-                f"(q={q!r}, guidance={ir.needs_guidance}, type={ir.matched_node.intent_type if ir.matched_node else 'none'}, conf={ir.confidence:.2f})"
-                for q, ir in zip(sub_queries, intents)
-            ]
-            logger.info(
-                "[RAG] ⑤ 意图分类 | %.1fms | %s",
-                (time.monotonic() - t0) * 1000, " | ".join(intent_summary),
-            )
-
-            for intent in intents:
-                if intent.needs_guidance:
-                    logger.info("[RAG] ✘ 意图不确定，返回引导事件")
-                    yield GuidanceEvent(intent=intent)
-                    return
+            if intent.needs_guidance:
+                logger.info("[RAG] ✘ 意图不确定，返回引导事件")
+                yield GuidanceEvent(intent=intent)
+                return
 
             # SYSTEM fast-path: no intent matched → skip retrieval (system fallback)
-            if all(ir.matched_node is None for ir in intents):
-                logger.info("[RAG] ⑥ 无匹配意图节点，跳过检索，直接生成(system回退)")
+            if not intent.matches:
+                logger.info("[RAG] ⑤ 无匹配意图节点，跳过检索，直接生成(system回退)")
                 prompt = self._prompt_builder.build(
-                    request.query, history, [], list(intents)
+                    request.query, history, [], [intent]
                 )
                 yield SourcesEvent(sources=[])
                 extra_kwargs: dict[str, Any] = {}
@@ -144,29 +129,29 @@ class RAGPipeline:
                 logger.info("[RAG] ■ 完成(system直答) | total=%dms", total_ms)
                 return
 
-            # ── Step 6: 多通道检索 ──
+            # ── Step 5: 多通道检索 ──
             t0 = time.monotonic()
             retrieved = await self._tracer.trace_node("retrieval")(
                 self._retriever.retrieve
-            )(sub_queries, intents)
+            )([rewritten], [intent])
             logger.info(
-                "[RAG] ⑥ 多通道检索 | %.1fms | chunks=%d",
+                "[RAG] ⑤ 多通道检索 | %.1fms | chunks=%d",
                 (time.monotonic() - t0) * 1000, len(retrieved),
             )
 
-            # ── Step 7: 重排序 ──
+            # ── Step 6: 重排序 ──
             if self._reranker is not None:
                 t0 = time.monotonic()
                 pre_count = len(retrieved)
                 retrieved = await self._reranker.rerank(request.query, retrieved)
                 logger.info(
-                    "[RAG] ⑦ 重排序 | %.1fms | %d → %d chunks",
+                    "[RAG] ⑥ 重排序 | %.1fms | %d → %d chunks",
                     (time.monotonic() - t0) * 1000, pre_count, len(retrieved),
                 )
             else:
-                logger.info("[RAG] ⑦ 重排序 | 跳过(未配置reranker)")
+                logger.info("[RAG] ⑥ 重排序 | 跳过(未配置reranker)")
 
-            # ── Step 8: 组装Sources ──
+            # ── Step 7: 组装Sources ──
             doc_ids = list({c.document_id for c in retrieved if c.document_id})
             doc_name_map = await self._doc_repo.batch_get_names(doc_ids) if doc_ids else {}
             source_items = [
@@ -181,22 +166,22 @@ class RAGPipeline:
                 for i, c in enumerate(retrieved)
             ]
             logger.info(
-                "[RAG] ⑧ 组装来源 | docs=%d sources=%d",
+                "[RAG] ⑦ 组装来源 | docs=%d sources=%d",
                 len(doc_ids), len(source_items),
             )
             yield SourcesEvent(sources=source_items)
 
-            # ── Step 9: 构建Prompt ──
+            # ── Step 8: 构建Prompt ──
             t0 = time.monotonic()
             prompt = self._prompt_builder.build(
-                request.query, history, retrieved, list(intents)
+                request.query, history, retrieved, [intent]
             )
             logger.info(
-                "[RAG] ⑨ 构建Prompt | %.1fms | messages=%d",
+                "[RAG] ⑧ 构建Prompt | %.1fms | messages=%d",
                 (time.monotonic() - t0) * 1000, len(prompt),
             )
 
-            # ── Step 10: LLM流式生成 ──
+            # ── Step 9: LLM流式生成 ──
             t0 = time.monotonic()
             extra_kwargs: dict[str, Any] = {}
             if request.deep_thinking:
@@ -206,11 +191,11 @@ class RAGPipeline:
                     answer_parts.append(event.content)
                 yield event
             logger.info(
-                "[RAG] ⑩ LLM生成 | %.1fms | answer_len=%d",
+                "[RAG] ⑨ LLM生成 | %.1fms | answer_len=%d",
                 (time.monotonic() - t0) * 1000, len("".join(answer_parts)),
             )
 
-            # ── Step 11: 保存记忆 ──
+            # ── Step 10: 保存记忆 ──
             sources_data = [s.model_dump() for s in source_items] if source_items else None
             await self._memory.save(
                 request.conversation_id,

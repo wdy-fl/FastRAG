@@ -13,6 +13,10 @@ class LLMProvider(Protocol):
         self, messages: list[dict], **kwargs
     ) -> AsyncIterator[LLMEvent]: ...
 
+    async def chat(
+        self, messages: list[dict], **kwargs
+    ) -> str: ...
+
     async def embed(
         self, texts: list[str], model: str | None = None
     ) -> list[list[float]]: ...
@@ -54,8 +58,6 @@ class QueryRewriter(Protocol):
     async def rewrite(
         self, query: str, history: ConversationHistory
     ) -> str: ...
-
-    async def split(self, query: str) -> list[str]: ...
 
 
 @runtime_checkable

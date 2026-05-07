@@ -156,7 +156,6 @@ def get_rag_pipeline(
             llm=llm,
             intent_repo=intent_repo,
             cache=redis,
-            confidence_threshold=s.rag_intent_confidence_threshold,
         ),
         retriever=MultiChannelRetriever(
             channels=[
@@ -165,7 +164,6 @@ def get_rag_pipeline(
                 Bm25KeywordChannel(bm25_manager=get_bm25_index_manager()),
             ],
             llm=embedding_llm,
-            chat_llm=llm,
         ),
         prompt_builder=PromptBuilder(),
         tracer=RagTracer(repo=trace_repo),

@@ -1,6 +1,5 @@
 from __future__ import annotations
 import asyncio
-import json
 import logging
 from typing import Protocol
 from backend.core.models.chat import RetrievedChunk
@@ -9,38 +8,11 @@ from backend.core.rag.protocols import LLMProvider, VectorStore
 
 logger = logging.getLogger("backend.rag.retrieve")
 
-_KEYWORD_EXTRACT_PROMPT = (
-    "从以下查询中提取3-5个用于关键词检索的短关键词，每个关键词1-4个字。"
-    '以JSON字符串数组格式返回，例如 ["关键词1", "关键词2"]。'
-    "只返回JSON数组，不要解释。"
-)
-
-
-async def _extract_keywords(llm: LLMProvider, query: str) -> list[str]:
-    """Extract search keywords from a query using LLM."""
-    parts: list[str] = []
-    async for event in llm.stream([
-        {"role": "user", "content": f"{_KEYWORD_EXTRACT_PROMPT}\n\nQuery: {query}"}
-    ]):
-        if event.type == "content":
-            parts.append(event.content)
-    raw = "".join(parts).strip()
-    try:
-        keywords = json.loads(raw)
-        if isinstance(keywords, list):
-            result = [str(k).strip() for k in keywords if k]
-            logger.debug("关键词提取 | query=%r | keywords=%s", query, result)
-            return result
-    except (json.JSONDecodeError, ValueError):
-        logger.warning("关键词提取JSON解析失败 | query=%r | raw=%s", query, raw[:200])
-    return []
-
 
 class SearchChannel(Protocol):
     async def search(
         self, query: str, intent: IntentResult, top_k: int,
         query_vector: list[float],
-        keywords: list[str] | None = None,
     ) -> list[RetrievedChunk]: ...
 
 
@@ -52,24 +24,27 @@ class VectorSearchChannel:
     async def search(
         self, query: str, intent: IntentResult, top_k: int = 10,
         query_vector: list[float] | None = None,
-        keywords: list[str] | None = None,
     ) -> list[RetrievedChunk]:
         if query_vector is None:
             vectors = await self._llm.embed([query])
             query_vector = vectors[0]
 
-        kb_id = None
-        if intent.matched_node:
-            if intent.matched_node.intent_type == "kb" and intent.matched_node.knowledge_base_id:
-                kb_id = intent.matched_node.knowledge_base_id
+        kb_ids = [
+            m.node.knowledge_base_id
+            for m in intent.matches
+            if m.node.intent_type == "kb" and m.node.knowledge_base_id
+        ] or [None]
 
-        results = await self._store.search(
-            query_vector=query_vector,
-            top_k=top_k,
-            knowledge_base_id=kb_id,
-        )
-        logger.debug("VectorSearch | query=%r | kb=%s | top_k=%d | returned=%d", query, kb_id, top_k, len(results))
-        return results
+        all_results: list[RetrievedChunk] = []
+        for kb_id in kb_ids:
+            results = await self._store.search(
+                query_vector=query_vector,
+                top_k=top_k,
+                knowledge_base_id=kb_id,
+            )
+            all_results.extend(results)
+            logger.debug("VectorSearch | query=%r | kb=%s | top_k=%d | returned=%d", query, kb_id, top_k, len(results))
+        return all_results
 
 
 class QuestionSearchChannel:
@@ -80,24 +55,27 @@ class QuestionSearchChannel:
     async def search(
         self, query: str, intent: IntentResult, top_k: int = 10,
         query_vector: list[float] | None = None,
-        keywords: list[str] | None = None,
     ) -> list[RetrievedChunk]:
         if query_vector is None:
             vectors = await self._llm.embed([query])
             query_vector = vectors[0]
 
-        kb_id = None
-        if intent.matched_node:
-            if intent.matched_node.intent_type == "kb" and intent.matched_node.knowledge_base_id:
-                kb_id = intent.matched_node.knowledge_base_id
+        kb_ids = [
+            m.node.knowledge_base_id
+            for m in intent.matches
+            if m.node.intent_type == "kb" and m.node.knowledge_base_id
+        ] or [None]
 
-        results = await self._store.search_questions(
-            query_vector=query_vector,
-            top_k=top_k,
-            knowledge_base_id=kb_id,
-        )
-        logger.debug("QuestionSearch | query=%r | kb=%s | top_k=%d | returned=%d", query, kb_id, top_k, len(results))
-        return results
+        all_results: list[RetrievedChunk] = []
+        for kb_id in kb_ids:
+            results = await self._store.search_questions(
+                query_vector=query_vector,
+                top_k=top_k,
+                knowledge_base_id=kb_id,
+            )
+            all_results.extend(results)
+            logger.debug("QuestionSearch | query=%r | kb=%s | top_k=%d | returned=%d", query, kb_id, top_k, len(results))
+        return all_results
 
 
 class RrfProcessor:
@@ -130,11 +108,9 @@ class MultiChannelRetriever:
         self,
         channels: list[SearchChannel],
         llm: LLMProvider | None = None,
-        chat_llm: LLMProvider | None = None,
     ) -> None:
         self._channels = channels
         self._llm = llm
-        self._chat_llm = chat_llm
         self._rrf = RrfProcessor()
 
     async def retrieve(
@@ -145,40 +121,23 @@ class MultiChannelRetriever:
             queries, len(self._channels),
         )
         query_vectors: dict[str, list[float]] = {}
-        query_keywords: dict[str, list[str]] = {}
 
         if self._llm is not None:
-            # Run embedding and keyword extraction in parallel
-            embed_task = asyncio.gather(
+            embeddings = await asyncio.gather(
                 *[self._llm.embed([q]) for q in queries]
             )
-            if self._chat_llm is not None:
-                kw_task = asyncio.gather(
-                    *[_extract_keywords(self._chat_llm, q) for q in queries]
-                )
-                embeddings, kw_results = await asyncio.gather(embed_task, kw_task)
-            else:
-                embeddings = await embed_task
-                kw_results = [[] for _ in queries]
             query_vectors = {q: v[0] for q, v in zip(queries, embeddings)}
-            query_keywords = {q: kw for q, kw in zip(queries, kw_results)}
             logger.debug("Embedding计算完成 | queries=%d", len(queries))
-            logger.info(
-                "关键词提取完成 | %s",
-                " | ".join(f"{q!r}→{kw}" for q, kw in query_keywords.items()),
-            )
 
         tasks = [
             channel.search(
                 query, intent, top_k=10,
                 query_vector=query_vectors.get(query),
-                keywords=query_keywords.get(query),
             )
             for query, intent in zip(queries, intents)
             for channel in self._channels
         ]
         channel_results: list[list[RetrievedChunk]] = await asyncio.gather(*tasks)
-        # Log per-channel results
         channel_names = [
             type(ch).__name__ for ch in self._channels
         ]

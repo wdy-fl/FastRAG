@@ -41,7 +41,6 @@ class Settings(BaseSettings):
     rag_window_size: int = 4
     rag_summary_threshold: int = 5
     rag_retrieval_top_k: int = 10
-    rag_intent_confidence_threshold: float = 0.6
 
     model_config = SettingsConfigDict(
         env_prefix="FASTRAG_",

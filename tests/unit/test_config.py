@@ -5,7 +5,7 @@ def test_settings_defaults():
     s = Settings()
     assert isinstance(s.llm.chat_model, str) and s.llm.chat_model
     assert s.rag_window_size == 4
-    assert s.rag_intent_confidence_threshold == 0.6
+    assert s.rag_retrieval_top_k == 10
 
 
 def test_llm_settings_defaults():

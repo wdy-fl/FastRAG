@@ -119,12 +119,12 @@ def _make_pipeline(doc_name_map: dict[str, str] | None = None) -> RAGPipeline:
     mock_retriever.retrieve = AsyncMock(return_value=[])
     mock_memory.load = AsyncMock(return_value=ConversationHistory())
     mock_rewriter.rewrite = AsyncMock(return_value="rewritten")
-    mock_rewriter.split = AsyncMock(return_value=["sub-q"])
 
-    # matched_node must not be None so the pipeline proceeds to retrieval
+    # matches must not be empty so the pipeline proceeds to retrieval
     mock_node = MagicMock(intent_type="qa")
+    mock_match = MagicMock(node=mock_node, confidence="high")
     mock_intent_classifier.classify = AsyncMock(
-        return_value=MagicMock(needs_guidance=False, matched_node=mock_node, confidence=0.5)
+        return_value=MagicMock(needs_guidance=False, matches=[mock_match])
     )
 
     mock_prompt_builder.build = MagicMock(return_value=[{"role": "user", "content": "q"}])

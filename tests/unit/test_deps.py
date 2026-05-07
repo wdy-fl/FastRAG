@@ -27,7 +27,6 @@ def test_get_rag_pipeline_wires_intent_repo_and_cache():
         mock_settings.return_value = MagicMock(
             rag_window_size=5,
             rag_summary_threshold=10,
-            rag_intent_confidence_threshold=0.6,
         )
         mock_llm.return_value = MagicMock()
         mock_embedding.return_value = MagicMock()
@@ -68,7 +67,6 @@ def test_get_rag_pipeline_wires_embedding_llm_to_retriever():
         mock_settings.return_value = MagicMock(
             rag_window_size=5,
             rag_summary_threshold=10,
-            rag_intent_confidence_threshold=0.6,
         )
         mock_llm.return_value = MagicMock()
         mock_embedding.return_value = embedding_llm
@@ -102,7 +100,6 @@ def test_get_rag_pipeline_accepts_mapping_repo():
         mock_settings.return_value = MagicMock(
             rag_window_size=5,
             rag_summary_threshold=10,
-            rag_intent_confidence_threshold=0.6,
         )
         mock_llm.return_value = MagicMock()
         mock_embedding.return_value = MagicMock()

@@ -17,19 +17,21 @@ class Bm25KeywordChannel:
         intent: IntentResult,
         top_k: int = 10,
         query_vector: list[float] | None = None,
-        keywords: list[str] | None = None,
     ) -> list[RetrievedChunk]:
-        # 确保索引已构建（懒加载 + 脏时重建）
         await self._bm25_manager.ensure_ready()
 
-        kb_id = None
-        if intent.matched_node:
-            if intent.matched_node.intent_type == "kb" and intent.matched_node.knowledge_base_id:
-                kb_id = intent.matched_node.knowledge_base_id
+        kb_ids = [
+            m.node.knowledge_base_id
+            for m in intent.matches
+            if m.node.intent_type == "kb" and m.node.knowledge_base_id
+        ] or [None]
 
-        results = self._bm25_manager.search(query=query, kb_id=kb_id, top_k=top_k)
-        logger.debug(
-            "Bm25Keyword | query=%r | kb=%s | results=%d",
-            query, kb_id, len(results),
-        )
-        return results
+        all_results: list[RetrievedChunk] = []
+        for kb_id in kb_ids:
+            results = self._bm25_manager.search(query=query, kb_id=kb_id, top_k=top_k)
+            all_results.extend(results)
+            logger.debug(
+                "Bm25Keyword | query=%r | kb=%s | results=%d",
+                query, kb_id, len(results),
+            )
+        return all_results

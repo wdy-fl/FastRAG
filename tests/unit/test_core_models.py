@@ -23,7 +23,7 @@ def test_intent_node():
 
 def test_intent_result_defaults():
     r = IntentResult()
-    assert r.confidence == 0.0
+    assert r.matches == []
     assert r.needs_guidance is False
 
 

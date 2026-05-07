@@ -5,7 +5,7 @@ from backend.core.rag.pipeline import RAGPipeline
 from backend.core.models.chat import (
     ChatRequest, ConversationHistory, LLMEvent, GuidanceEvent, RetrievedChunk,
 )
-from backend.core.models.intent import IntentNode, IntentResult
+from backend.core.models.intent import IntentMatch, IntentNode, IntentResult
 
 
 def _make_stream(content: str):
@@ -44,7 +44,6 @@ def _make_pipeline(
 
     mock_rewriter = AsyncMock()
     mock_rewriter.rewrite = AsyncMock(return_value="rewritten query")
-    mock_rewriter.split = AsyncMock(return_value=["rewritten query"])
 
     if intent_classifier is not None:
         mock_intent = intent_classifier
@@ -158,8 +157,7 @@ async def test_pipeline_calls_reranker_when_provided():
     mock_intent = AsyncMock()
     mock_intent.classify = AsyncMock(
         return_value=IntentResult(
-            matched_node=IntentNode(id="n1", name="test"),
-            confidence=0.9,
+            matches=[IntentMatch(node=IntentNode(id="n1", name="test"), confidence="high")]
         )
     )
 
@@ -199,10 +197,10 @@ async def test_pipeline_skips_reranker_when_none():
 
 @pytest.mark.asyncio
 async def test_pipeline_fast_path_on_no_intent_match():
-    """All sub-queries have no matched node → skip retrieval, direct LLM answer (system fallback)."""
+    """No matched node → skip retrieval, direct LLM answer (system fallback)."""
     mock_intent = AsyncMock()
     mock_intent.classify = AsyncMock(
-        return_value=IntentResult(matched_node=None, confidence=0.2)
+        return_value=IntentResult()
     )
 
     mock_retriever = AsyncMock()

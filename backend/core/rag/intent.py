@@ -1,18 +1,29 @@
 from __future__ import annotations
 import json
 import logging
-from backend.core.models.intent import IntentNode, IntentResult
+from backend.core.models.intent import IntentMatch, IntentNode, IntentResult
 from backend.core.rag.protocols import LLMProvider
 from backend.infra.cache.redis import RedisCache
 
 logger = logging.getLogger("backend.rag.intent")
 
 _CLASSIFY_PROMPT = (
-    "你是一个意图分类器。根据以下用户查询和可用的意图节点，"
-    "识别最匹配的意图节点。\n"
+    "你是一个意图分类器。根据用户查询和可用的意图节点，识别匹配的意图节点。\n\n"
+    "规则：\n"
+    "- 对每个可能匹配的节点，给出 confidence 等级：high（几乎确定相关）、medium（可能相关）、low（不太相关）\n"
+    "- 只返回 medium 及以上的匹配，忽略 low\n"
+    "- 如果没有任何节点相关，返回空列表\n"
+    "- 一个查询可以匹配多个节点\n\n"
+    "示例：\n"
+    "可用节点:\n"
+    "- id=n1 name=年假政策 keywords=['年假','假期'] description=公司年假相关规定\n"
+    "- id=n2 name=报销流程 keywords=['报销','费用'] description=费用报销流程指南\n\n"
+    '查询: 年假怎么申请？→ {{"matches": [{{"id": "n1", "confidence": "high"}}]}}\n'
+    '查询: 年假和报销的区别？→ {{"matches": [{{"id": "n1", "confidence": "high"}}, {{"id": "n2", "confidence": "high"}}]}}\n'
+    '查询: 今天天气怎么样？→ {{"matches": []}}\n\n'
     "可用节点:\n{nodes}\n\n"
     "查询: {query}\n\n"
-    "仅以JSON格式回复: {{\"confidence\": <0.0-1.0>, \"matched_id\": <节点id或null>}}"
+    '仅以JSON格式回复，不要解释: {{"matches": [{{"id": "<节点id>", "confidence": "high|medium"}}]}}'
 )
 
 
@@ -22,13 +33,11 @@ class LLMIntentClassifier:
         llm: LLMProvider,
         intent_repo: "IntentRepo | None" = None,
         cache: RedisCache | None = None,
-        confidence_threshold: float = 0.6,
         intent_nodes: list[IntentNode] | None = None,
     ) -> None:
         self._llm = llm
         self._repo = intent_repo
         self._cache = cache
-        self._threshold = confidence_threshold
         self._static_nodes: list[IntentNode] = intent_nodes or []
 
     async def _load_nodes(self) -> list[IntentNode]:
@@ -69,64 +78,57 @@ class LLMIntentClassifier:
         nodes = await self._load_nodes()
         if not nodes:
             logger.info("意图分类 | 无意图节点配置，跳过分类 | query=%r", query)
-            return IntentResult(needs_guidance=False, confidence=1.0)
+            return IntentResult()
 
         nodes_text = "\n".join(
             f"- id={n.id} name={n.name} keywords={n.keywords} description={n.description}"
             for n in nodes
         )
         prompt = _CLASSIFY_PROMPT.format(nodes=nodes_text or "none", query=query)
-        parts: list[str] = []
-        async for event in self._llm.stream(
-            [{"role": "user", "content": prompt}]
-        ):
-            if event.type == "content":
-                parts.append(event.content)
-        raw = "".join(parts).strip()
-        logger.debug("意图分类 | LLM原始响应 | %s", raw)
+        raw = await self._llm.chat([{"role": "user", "content": prompt}])
+        raw = raw.strip()
+        logger.debug("意图分类 | LLM响应 | %s", raw)
         try:
             data = json.loads(raw)
         except (json.JSONDecodeError, ValueError):
             logger.warning("意图分类 | JSON解析失败 | raw=%s", raw[:200])
             return IntentResult(needs_guidance=True, guidance_message="意图分类失败。")
 
-        confidence = float(data.get("confidence", 0.0))
-        matched_id = data.get("matched_id")
+        raw_matches = data.get("matches", [])
+        if not isinstance(raw_matches, list):
+            raw_matches = []
         nodes_by_id = {n.id: n for n in nodes}
-        matched_node = nodes_by_id.get(matched_id) if matched_id else None
 
-        if matched_id is None:
+        matches: list[IntentMatch] = []
+        for item in raw_matches:
+            mid = item.get("id")
+            conf = item.get("confidence", "medium")
+            if mid and mid in nodes_by_id and conf in ("high", "medium", "low"):
+                matches.append(IntentMatch(node=nodes_by_id[mid], confidence=conf))
+
+        # 只保留 medium 及以上
+        matches = [m for m in matches if m.confidence in ("high", "medium")]
+
+        if not matches:
+            logger.info("意图分类 | 无匹配节点 → system回退 | query=%r", query)
+            return IntentResult()
+
+        # 有 medium 但没有 high → 需要引导
+        has_high = any(m.confidence == "high" for m in matches)
+        if not has_high:
             logger.info(
-                "意图分类 | 无匹配节点 → system回退 | query=%r | confidence=%.2f",
-                query, confidence,
+                "意图分类 | 仅有medium匹配 → 引导 | query=%r | matches=%s",
+                query, [(m.node.name, m.confidence) for m in matches],
             )
             return IntentResult(
-                matched_node=None,
-                confidence=confidence,
-                needs_guidance=False,
-            )
-
-        if confidence < self._threshold:
-            logger.info(
-                "意图分类 | 低置信度 → 引导 | query=%r | confidence=%.2f < threshold=%.2f | matched_id=%s",
-                query, confidence, self._threshold, matched_id,
-            )
-            return IntentResult(
-                confidence=confidence,
+                matches=matches,
                 needs_guidance=True,
                 guidance_message="请进一步澄清您的问题。",
-                candidates=list(nodes[:3]),
+                candidates=[m.node for m in matches[:3]],
             )
 
         logger.info(
-            "意图分类 | 命中 | query=%r | confidence=%.2f | matched=%s (type=%s, kb=%s)",
-            query, confidence,
-            matched_node.name if matched_node else None,
-            matched_node.intent_type if matched_node else None,
-            matched_node.knowledge_base_id if matched_node else None,
+            "意图分类 | 命中 | query=%r | matches=%s",
+            query, [(m.node.name, m.confidence, m.node.knowledge_base_id) for m in matches],
         )
-        return IntentResult(
-            matched_node=matched_node,
-            confidence=confidence,
-            needs_guidance=False,
-        )
+        return IntentResult(matches=matches, needs_guidance=False)

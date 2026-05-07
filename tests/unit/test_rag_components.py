@@ -11,7 +11,7 @@ from backend.infra.search.keyword import Bm25KeywordChannel
 from backend.infra.search.bm25_index import Bm25IndexManager
 from backend.core.rag.prompt import PromptBuilder
 from backend.core.models.chat import ConversationHistory, LLMEvent, RetrievedChunk
-from backend.core.models.intent import IntentNode, IntentResult
+from backend.core.models.intent import IntentMatch, IntentNode, IntentResult
 
 
 def _make_stream(content: str):
@@ -56,37 +56,20 @@ async def test_rewriter_rewrite_returns_string():
 
 
 @pytest.mark.asyncio
-async def test_rewriter_split_returns_list():
-    mock_llm = MagicMock()
-    mock_llm.stream = MagicMock(
-        side_effect=lambda msgs, **kw: _make_stream("1. What is ML?\n2. How does it work?")
-    )
-    rewriter = LLMQueryRewriter(llm=mock_llm)
-    parts = await rewriter.split("What is ML and how does it work?")
-    assert isinstance(parts, list)
-    assert len(parts) >= 1
-
-
-@pytest.mark.asyncio
 async def test_classifier_returns_intent_result():
     mock_llm = MagicMock()
-    mock_llm.stream = MagicMock(
-        side_effect=lambda msgs, **kw: _make_stream('{"confidence": 0.9, "matched_id": null}')
-    )
-    classifier = LLMIntentClassifier(llm=mock_llm, intent_nodes=[], confidence_threshold=0.6)
+    mock_llm.chat = AsyncMock(return_value='{"matches": []}')
+    classifier = LLMIntentClassifier(llm=mock_llm, intent_nodes=[])
     result = await classifier.classify("What is machine learning?")
     assert isinstance(result, IntentResult)
 
 
 @pytest.mark.asyncio
-async def test_classifier_matched_but_low_confidence_needs_guidance():
+async def test_classifier_matched_but_medium_only_needs_guidance():
     mock_llm = MagicMock()
-    mock_llm.stream = MagicMock(
-        side_effect=lambda msgs, **kw: _make_stream('{"confidence": 0.3, "matched_id": "n1"}')
-    )
-    # 需要提供至少一个节点，否则 classifier 直接跳过不走 LLM
+    mock_llm.chat = AsyncMock(return_value='{"matches": [{"id": "n1", "confidence": "medium"}]}')
     dummy_node = IntentNode(id="n1", name="General")
-    classifier = LLMIntentClassifier(llm=mock_llm, intent_nodes=[dummy_node], confidence_threshold=0.6)
+    classifier = LLMIntentClassifier(llm=mock_llm, intent_nodes=[dummy_node])
     result = await classifier.classify("ambiguous question")
     assert result.needs_guidance is True
 
@@ -94,14 +77,12 @@ async def test_classifier_matched_but_low_confidence_needs_guidance():
 @pytest.mark.asyncio
 async def test_classifier_no_match_returns_system_fallback():
     mock_llm = MagicMock()
-    mock_llm.stream = MagicMock(
-        side_effect=lambda msgs, **kw: _make_stream('{"confidence": 0.3, "matched_id": null}')
-    )
+    mock_llm.chat = AsyncMock(return_value='{"matches": []}')
     dummy_node = IntentNode(id="n1", name="General")
-    classifier = LLMIntentClassifier(llm=mock_llm, intent_nodes=[dummy_node], confidence_threshold=0.6)
+    classifier = LLMIntentClassifier(llm=mock_llm, intent_nodes=[dummy_node])
     result = await classifier.classify("unrelated question")
     assert result.needs_guidance is False
-    assert result.matched_node is None
+    assert not result.matches
 
 
 @pytest.mark.asyncio
@@ -190,9 +171,7 @@ async def test_multi_channel_retriever_uses_rrf():
 @pytest.mark.asyncio
 async def test_classifier_loads_nodes_from_repo():
     mock_llm = MagicMock()
-    mock_llm.stream = MagicMock(
-        side_effect=lambda msgs, **kw: _make_stream('{"confidence": 0.9, "matched_id": "n1"}')
-    )
+    mock_llm.chat = AsyncMock(return_value='{"matches": [{"id": "n1", "confidence": "high"}]}')
     orm_node = MagicMock(
         id="n1", name="Finance",
         intent_type="kb", keywords=["finance"], description="",
@@ -213,19 +192,16 @@ async def test_classifier_loads_nodes_from_repo():
 
     classifier = LLMIntentClassifier(
         llm=mock_llm, intent_repo=mock_repo, cache=mock_cache,
-        confidence_threshold=0.6,
     )
     result = await classifier.classify("What is finance?")
-    assert result.matched_node is not None
-    assert result.matched_node.id == "n1"
+    assert result.primary_node is not None
+    assert result.primary_node.id == "n1"
 
 
 @pytest.mark.asyncio
 async def test_classifier_caches_nodes_in_redis():
     mock_llm = MagicMock()
-    mock_llm.stream = MagicMock(
-        side_effect=lambda msgs, **kw: _make_stream('{"confidence": 0.9, "matched_id": null}')
-    )
+    mock_llm.chat = AsyncMock(return_value='{"matches": []}')
     mock_repo = AsyncMock()
     mock_repo.list_intent_nodes = AsyncMock(return_value=[])
     mock_cache = AsyncMock()
@@ -234,7 +210,6 @@ async def test_classifier_caches_nodes_in_redis():
 
     classifier = LLMIntentClassifier(
         llm=mock_llm, intent_repo=mock_repo, cache=mock_cache,
-        confidence_threshold=0.6,
     )
     await classifier.classify("test")
     mock_cache.set.assert_awaited_once()
@@ -253,7 +228,6 @@ async def test_classifier_reads_from_redis_cache():
 
     classifier = LLMIntentClassifier(
         llm=mock_llm, intent_repo=mock_repo, cache=mock_cache,
-        confidence_threshold=0.6,
     )
     nodes = await classifier._load_nodes()
     assert len(nodes) == 1
@@ -279,7 +253,7 @@ async def test_vector_channel_routes_to_specific_kb():
     mock_store.search = AsyncMock(return_value=[])
     channel = VectorSearchChannel(vector_store=mock_store, llm=AsyncMock())
     node = IntentNode(id="n1", name="Finance", intent_type="kb", knowledge_base_id="kb-1")
-    intent = IntentResult(matched_node=node, confidence=0.9)
+    intent = IntentResult(matches=[IntentMatch(node=node, confidence="high")])
     await channel.search("query", intent, top_k=5, query_vector=[0.1] * 10)
     mock_store.search.assert_awaited_once_with(
         query_vector=[0.1] * 10, top_k=5, knowledge_base_id="kb-1",
@@ -292,7 +266,7 @@ async def test_vector_channel_no_route_for_system_intent():
     mock_store.search = AsyncMock(return_value=[])
     channel = VectorSearchChannel(vector_store=mock_store, llm=AsyncMock())
     node = IntentNode(id="n1", name="Chat", intent_type="system")
-    intent = IntentResult(matched_node=node, confidence=0.9)
+    intent = IntentResult(matches=[IntentMatch(node=node, confidence="high")])
     await channel.search("query", intent, top_k=5, query_vector=[0.1] * 10)
     mock_store.search.assert_awaited_once_with(
         query_vector=[0.1] * 10, top_k=5, knowledge_base_id=None,
@@ -336,7 +310,7 @@ async def test_bm25_keyword_channel_routes_to_kb():
 
     channel = Bm25KeywordChannel(bm25_manager=manager)
     node = IntentNode(id="n1", name="Finance", intent_type="kb", knowledge_base_id="kb-1")
-    intent = IntentResult(matched_node=node, confidence=0.9)
+    intent = IntentResult(matches=[IntentMatch(node=node, confidence="high")])
     results = await channel.search("退货", intent, top_k=5, query_vector=[0.1] * 10)
     assert isinstance(results, list)
 
