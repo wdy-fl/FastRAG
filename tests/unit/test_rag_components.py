@@ -10,15 +10,8 @@ from backend.core.rag.retrieve import (
 from backend.infra.search.keyword import Bm25KeywordChannel
 from backend.infra.search.bm25_index import Bm25IndexManager
 from backend.core.rag.prompt import PromptBuilder
-from backend.core.models.chat import ConversationHistory, LLMEvent, RetrievedChunk
+from backend.core.models.chat import ConversationHistory, RetrievedChunk
 from backend.core.models.intent import IntentMatch, IntentNode, IntentResult
-
-
-def _make_stream(content: str):
-    """返回 async generator，用于 mock llm.stream()。"""
-    async def _gen():
-        yield LLMEvent(type="content", content=content)
-    return _gen()
 
 
 def _make_bm25_manager_with_data():
@@ -47,7 +40,7 @@ def _make_bm25_manager_with_data():
 @pytest.mark.asyncio
 async def test_rewriter_rewrite_returns_string():
     mock_llm = MagicMock()
-    mock_llm.stream = MagicMock(side_effect=lambda msgs, **kw: _make_stream("Rewritten query"))
+    mock_llm.chat = AsyncMock(return_value="Rewritten query")
 
     rewriter = LLMQueryRewriter(llm=mock_llm)
     result = await rewriter.rewrite("what is ml?", ConversationHistory())
