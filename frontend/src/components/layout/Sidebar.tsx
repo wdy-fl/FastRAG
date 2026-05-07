@@ -1,12 +1,9 @@
 import * as React from "react";
-import { differenceInCalendarDays, isValid } from "date-fns";
 import {
-  BookOpen,
   Bot,
   MessageSquare,
   MoreHorizontal,
   Pencil,
-  PlayCircle,
   Plus,
   Search,
   Settings,
@@ -75,36 +72,6 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
       return title.includes(keyword) || session.id.toLowerCase().includes(keyword);
     });
   }, [query, sessions]);
-
-  const groupedSessions = React.useMemo(() => {
-    const now = new Date();
-    const groups = new Map<string, typeof filteredSessions>();
-    const order: string[] = [];
-
-    const resolveLabel = (value?: string) => {
-      const parsed = value ? new Date(value) : now;
-      const date = isValid(parsed) ? parsed : now;
-      const diff = Math.max(0, differenceInCalendarDays(now, date));
-      if (diff === 0) return "今天";
-      if (diff <= 7) return "7天内";
-      if (diff <= 30) return "30天内";
-      return "更早";
-    };
-
-    filteredSessions.forEach((session) => {
-      const label = resolveLabel(session.lastTime);
-      if (!groups.has(label)) {
-        groups.set(label, []);
-        order.push(label);
-      }
-      groups.get(label)?.push(session);
-    });
-
-    return order.map((label) => ({
-      label,
-      items: groups.get(label) || []
-    }));
-  }, [filteredSessions]);
 
   React.useEffect(() => {
     if (renamingId) {
@@ -179,12 +146,6 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
               className="absolute -left-12 -bottom-10 h-28 w-28 rounded-full bg-[#FDE68A]/70 blur-2xl"
             />
             <div className="relative">
-              <div className="flex items-center justify-between px-1">
-                <span className="text-[11px] font-semibold text-[#94A3B8]">快速开始</span>
-                <span className="rounded-full bg-white/80 px-2 py-0.5 text-[10px] font-semibold text-[#2563EB]">
-                  新内容
-                </span>
-              </div>
               <button
                 type="button"
                 className="mt-2 flex w-full items-center gap-3 rounded-2xl bg-white/90 px-4 py-3 text-left shadow-[0_10px_20px_rgba(15,23,42,0.08)] transition-all hover:-translate-y-[1px] hover:shadow-[0_16px_30px_rgba(15,23,42,0.12)]"
@@ -199,19 +160,7 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
                 </span>
                 <span className="flex-1">
                   <span className="block text-sm font-semibold text-[#1F2937]">新建对话</span>
-                  <span className="block text-xs text-[#94A3B8]">从空白开始</span>
                 </span>
-              </button>
-              <button
-                type="button"
-                className="mt-2 inline-flex items-center gap-2 rounded-full border border-white/80 bg-white/70 px-3 py-1.5 text-xs font-semibold text-[#1D4ED8] transition-colors hover:bg-white"
-                onClick={() => {
-                  navigate("/admin");
-                  onClose();
-                }}
-              >
-                <Settings className="h-3.5 w-3.5" />
-                管理后台
               </button>
             </div>
           </div>
@@ -252,12 +201,10 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
               </div>
             ) : (
               <div>
-                {groupedSessions.map((group, index) => (
-                  <div key={group.label} className={cn("flex flex-col", index === 0 ? "mt-0" : "mt-4")}>
-                    <p className="mb-1.5 pl-3 text-[12px] font-normal leading-[18px] text-[#999999]">
-                      {group.label}
-                    </p>
-                    {group.items.map((session) => (
+                <p className="mb-1.5 pl-3 text-[12px] font-normal leading-[18px] text-[#999999]">
+                  历史会话
+                </p>
+                {filteredSessions.map((session) => (
                       <div
                         key={session.id}
                         className={cn(
@@ -358,8 +305,6 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
                         </DropdownMenu>
                       </div>
                     ))}
-                  </div>
-                ))}
               </div>
             )}
           </div>
@@ -369,45 +314,17 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
           />
         </div>
         <div className="mt-auto pt-3">
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <button
-                type="button"
-                className="flex w-full items-center gap-2 rounded-lg p-2 text-left transition-colors hover:bg-[#F5F5F5] data-[state=open]:bg-[#EEEEEE]"
-                aria-label="用户菜单"
-              >
-                <div className="flex h-8 w-8 items-center justify-center overflow-hidden rounded-full bg-[#3B82F6] text-white">
-                  <span className="text-sm font-medium">U</span>
-                </div>
-                <span className="flex-1 truncate text-sm font-medium text-[#1A1A1A]">用户</span>
-                <MoreHorizontal className="h-4 w-4 text-[#999999]" />
-              </button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="start" side="top" sideOffset={8} className="w-48">
-              <DropdownMenuItem asChild>
-                <a
-                  href="https://nageoffer.com/fastrag"
-                  target="_blank"
-                  rel="noreferrer"
-                  className="flex items-center"
-                >
-                  <BookOpen className="mr-2 h-4 w-4" />
-                  官方文档
-                </a>
-              </DropdownMenuItem>
-              <DropdownMenuItem asChild>
-                <a
-                  href="https://space.bilibili.com/352177376"
-                  target="_blank"
-                  rel="noreferrer"
-                  className="flex items-center"
-                >
-                  <PlayCircle className="mr-2 h-4 w-4" />
-                  哔哩哔哩
-                </a>
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
+          <button
+            type="button"
+            className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm font-medium text-[#1D4ED8] transition-colors hover:bg-[#EFF6FF]"
+            onClick={() => {
+              navigate("/admin");
+              onClose();
+            }}
+          >
+            <Settings className="h-4 w-4" />
+            管理后台
+          </button>
         </div>
       </aside>
       <AlertDialog open={Boolean(deleteTarget)} onOpenChange={(open) => {
