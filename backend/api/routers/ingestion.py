@@ -188,8 +188,8 @@ async def trigger_ingestion(
                     await _task_repo.update_completed(task.id, chunk_count=chunk_count)
                 except asyncio.TimeoutError:
                     await _doc_repo.update_document_status(doc.id, status="failed",
-                                                            error_message="Ingestion timeout")
-                    await _task_repo.update_failed(task.id, error="Ingestion timeout")
+                                                            error_message="导入超时")
+                    await _task_repo.update_failed(task.id, error="导入超时")
                 except Exception as exc:
                     await _doc_repo.update_document_status(doc.id, status="failed",
                                                             error_message=str(exc))
@@ -223,7 +223,7 @@ async def delete_document(
     if doc.status not in ("completed", "failed"):
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
-            detail="Document is still being processed, please wait until ingestion finishes",
+            detail="文档正在处理中，请等待导入完成",
         )
     await task_repo.delete_by_document(doc_id)
     _ = await kb_repo.delete_document(doc_id)
