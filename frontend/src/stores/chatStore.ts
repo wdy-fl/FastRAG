@@ -475,6 +475,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
       ),
     }));
     if (!rating) {
+      await chatService.submitFeedback(messageId, null);
       toast.success("取消成功");
       return;
     }
