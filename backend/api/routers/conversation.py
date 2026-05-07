@@ -1,4 +1,6 @@
 from __future__ import annotations
+from typing import Literal
+
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel
 from backend.api.deps import get_conversation_repo
@@ -26,6 +28,11 @@ class MessageResponse(BaseModel):
     content: str
     seq: int
     sources: list[dict] | None = None
+    feedback: str | None = None
+
+
+class FeedbackRequest(BaseModel):
+    rating: Literal["up", "down"] | None
 
 
 @router.post("", status_code=status.HTTP_201_CREATED, response_model=ConversationResponse)
@@ -57,7 +64,7 @@ async def list_messages(
     return [
         MessageResponse(
             id=m.id, role=m.role, content=m.content, seq=m.seq,
-            sources=m.sources,
+            sources=m.sources, feedback=m.feedback,
         )
         for m in messages
     ]
@@ -93,3 +100,15 @@ async def delete_conversation(
     repo: ConversationRepo = Depends(get_conversation_repo),
 ) -> None:
     await repo.delete_conversation(conversation_id)
+
+
+@router.post("/messages/{message_id}/feedback", status_code=status.HTTP_204_NO_CONTENT)
+async def submit_feedback(
+    message_id: str,
+    req: FeedbackRequest,
+    repo: ConversationRepo = Depends(get_conversation_repo),
+) -> None:
+    message = await repo.get_message(message_id)
+    if not message:
+        raise HTTPException(status_code=404, detail="消息不存在")
+    await repo.update_message_feedback(message_id, req.rating)
