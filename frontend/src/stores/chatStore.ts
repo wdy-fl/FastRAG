@@ -467,14 +467,14 @@ export const useChatStore = create<ChatState>((set, get) => ({
   },
 
   submitFeedback: async (messageId, feedback) => {
-    const rating = feedback === "like" ? "up" : feedback === "dislike" ? "down" : null;
+    const feedbackValue = feedback === "like" ? "up" : feedback === "dislike" ? "down" : null;
     const prev = get().messages.find((m) => m.id === messageId);
     set((state) => ({
       messages: state.messages.map((m) =>
         m.id === messageId ? { ...m, feedback } : m
       ),
     }));
-    if (!rating) {
+    if (!feedbackValue) {
       try {
         await chatService.submitFeedback(messageId, null);
         toast.success("取消成功");
@@ -490,7 +490,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
       return;
     }
     try {
-      await chatService.submitFeedback(messageId, rating);
+      await chatService.submitFeedback(messageId, feedbackValue);
       toast.success(feedback === "like" ? "点赞成功" : "点踩成功");
     } catch (error) {
       // 回滚

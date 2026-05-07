@@ -32,7 +32,7 @@ class MessageResponse(BaseModel):
 
 
 class FeedbackRequest(BaseModel):
-    rating: Literal["up", "down"] | None
+    feedback: Literal["up", "down"] | None
 
 
 @router.post("", status_code=status.HTTP_201_CREATED, response_model=ConversationResponse)
@@ -111,4 +111,4 @@ async def submit_feedback(
     message = await repo.get_message(message_id)
     if not message:
         raise HTTPException(status_code=404, detail="消息不存在")
-    await repo.update_message_feedback(message, req.rating)
+    await repo.update_message_feedback(message, req.feedback)
