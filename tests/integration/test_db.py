@@ -123,3 +123,39 @@ async def test_trace_run_lifecycle(db_session):
     assert run.total_duration_ms == 150
     assert len(run.nodes) == 1
     assert run.nodes[0].node_name == "memory_load"
+
+
+@pytest.mark.asyncio
+async def test_update_message_feedback(db_session):
+    repo = ConversationRepo(db_session)
+    conv_id = str(uuid4())
+    db_session.add(ConversationORM(id=conv_id, title="Feedback test"))
+    await db_session.commit()
+
+    msg = await repo.save_message(conv_id, role="assistant", content="answer")
+    assert msg.feedback is None
+
+    # 点赞
+    fetched = await repo.get_message(msg.id)
+    await repo.update_message_feedback(fetched, "up")
+    fetched = await repo.get_message(msg.id)
+    assert fetched.feedback == "up"
+
+    # 点踩
+    fetched = await repo.get_message(msg.id)
+    await repo.update_message_feedback(fetched, "down")
+    fetched = await repo.get_message(msg.id)
+    assert fetched.feedback == "down"
+
+    # 取消
+    fetched = await repo.get_message(msg.id)
+    await repo.update_message_feedback(fetched, None)
+    fetched = await repo.get_message(msg.id)
+    assert fetched.feedback is None
+
+
+@pytest.mark.asyncio
+async def test_get_message_not_found(db_session):
+    repo = ConversationRepo(db_session)
+    result = await repo.get_message("nonexistent-id")
+    assert result is None
