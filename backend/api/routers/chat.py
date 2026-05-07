@@ -57,7 +57,9 @@ async def _event_stream(
     title: str | None = None
     if is_first_turn:
         title = await _generate_title(request.query, llm)
-        await repo.update_title(request.conversation_id, title)
+        conv = await repo.get_conversation(request.conversation_id)
+        if conv:
+            await repo.update_title(conv, title)
 
     # 4. 发送 done 事件（首轮携带 title，后续轮 title 为 null）
     done_payload: dict = {"type": "done", "content": "", "title": title}

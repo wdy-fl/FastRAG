@@ -90,7 +90,7 @@ async def update_conversation(
     conv = await repo.get_conversation(conversation_id)
     if not conv:
         raise HTTPException(status_code=404, detail="Conversation not found")
-    await repo.update_title(conversation_id, body.title)
+    await repo.update_title(conv, body.title)
     return ConversationResponse(id=conversation_id, title=body.title)
 
 
@@ -111,4 +111,4 @@ async def submit_feedback(
     message = await repo.get_message(message_id)
     if not message:
         raise HTTPException(status_code=404, detail="消息不存在")
-    await repo.update_message_feedback(message_id, req.rating)
+    await repo.update_message_feedback(message, req.rating)

@@ -84,11 +84,9 @@ class ConversationRepo:
         result = await self._session.execute(stmt)
         return result.scalar_one()
 
-    async def update_title(self, conversation_id: str, title: str) -> None:
-        conv = await self.get_conversation(conversation_id)
-        if conv:
-            conv.title = title
-            await self._session.commit()
+    async def update_title(self, conv: ConversationORM, title: str) -> None:
+        conv.title = title
+        await self._session.commit()
 
     async def create_conversation(self, title: str) -> ConversationORM:
         conv = ConversationORM(id=str(uuid4()), title=title)
@@ -144,10 +142,6 @@ class ConversationRepo:
         result = await self._session.execute(stmt)
         return result.scalar_one_or_none()
 
-    async def update_message_feedback(self, message_id: str, feedback: str | None) -> None:
-        stmt = select(MessageORM).where(MessageORM.id == message_id)
-        result = await self._session.execute(stmt)
-        message = result.scalar_one_or_none()
-        if message:
-            message.feedback = feedback
-            await self._session.commit()
+    async def update_message_feedback(self, message: MessageORM, feedback: str | None) -> None:
+        message.feedback = feedback
+        await self._session.commit()
