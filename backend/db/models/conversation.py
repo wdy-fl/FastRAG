@@ -32,6 +32,7 @@ class MessageORM(Base):
     role: Mapped[str] = mapped_column(String(20))
     content: Mapped[str] = mapped_column(Text)
     sources: Mapped[list | None] = mapped_column(JSON, nullable=True)
+    feedback: Mapped[str | None] = mapped_column(String(10), nullable=True)
     created_at: Mapped[datetime] = mapped_column(server_default=func.now())
     conversation: Mapped[ConversationORM] = relationship(back_populates="messages")
 
