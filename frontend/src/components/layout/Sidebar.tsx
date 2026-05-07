@@ -5,7 +5,6 @@ import {
   MoreHorizontal,
   Pencil,
   Plus,
-  Search,
   Settings,
   Trash2
 } from "lucide-react";
@@ -49,7 +48,6 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
     fetchSessions
   } = useChatStore();
   const navigate = useNavigate();
-  const [query, setQuery] = React.useState("");
   const [renamingId, setRenamingId] = React.useState<string | null>(null);
   const [renameValue, setRenameValue] = React.useState("");
   const [deleteTarget, setDeleteTarget] = React.useState<{
@@ -63,15 +61,6 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
       fetchSessions().catch(() => null);
     }
   }, [fetchSessions, sessions.length]);
-
-  const filteredSessions = React.useMemo(() => {
-    const keyword = query.trim().toLowerCase();
-    if (!keyword) return sessions;
-    return sessions.filter((session) => {
-      const title = (session.title || "新对话").toLowerCase();
-      return title.includes(keyword) || session.id.toLowerCase().includes(keyword);
-    });
-  }, [query, sessions]);
 
   React.useEffect(() => {
     if (renamingId) {
@@ -135,53 +124,6 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
             </div>
           </div>
         </div>
-        <div className="py-3 space-y-4">
-          <div className="relative overflow-hidden rounded-2xl border border-[#E6EEF6] bg-gradient-to-br from-[#F0F9FF] via-white to-[#FEF3C7] p-3 shadow-[0_14px_30px_rgba(15,23,42,0.08)]">
-            <span
-              aria-hidden="true"
-              className="absolute -right-10 -top-10 h-24 w-24 rounded-full bg-[#BAE6FD]/70 blur-2xl"
-            />
-            <span
-              aria-hidden="true"
-              className="absolute -left-12 -bottom-10 h-28 w-28 rounded-full bg-[#FDE68A]/70 blur-2xl"
-            />
-            <div className="relative">
-              <button
-                type="button"
-                className="mt-2 flex w-full items-center gap-3 rounded-2xl bg-white/90 px-4 py-3 text-left shadow-[0_10px_20px_rgba(15,23,42,0.08)] transition-all hover:-translate-y-[1px] hover:shadow-[0_16px_30px_rgba(15,23,42,0.12)]"
-                onClick={() => {
-                  createSession().catch(() => null);
-                  navigate("/chat");
-                  onClose();
-                }}
-              >
-                <span className="flex h-11 w-11 items-center justify-center rounded-2xl bg-gradient-to-br from-[#60A5FA] to-[#2563EB] text-white shadow-[0_6px_14px_rgba(37,99,235,0.3)]">
-                  <Plus className="h-4 w-4" />
-                </span>
-                <span className="flex-1">
-                  <span className="block text-sm font-semibold text-[#1F2937]">新建对话</span>
-                </span>
-              </button>
-            </div>
-          </div>
-          <div className="rounded-2xl border border-[#E6EEF6] bg-white p-3 shadow-[0_12px_26px_rgba(15,23,42,0.06)]">
-            <div className="flex items-center justify-between px-1">
-              <span className="text-[11px] font-semibold text-[#94A3B8]">搜索对话</span>
-              <span className="text-[10px] text-[#CBD5F5]">Ctrl / Cmd + K</span>
-            </div>
-            <div className="mt-2">
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#9CA3AF]" />
-                <input
-                  value={query}
-                  onChange={(event) => setQuery(event.target.value)}
-                  placeholder="搜索对话..."
-                  className="h-10 w-full rounded-xl border border-[#E5E7EB] bg-[#F8FAFC] pl-9 pr-3 text-sm text-[#1F2937] placeholder:text-[#9CA3AF] focus:border-[#93C5FD] focus:outline-none transition-colors"
-                />
-              </div>
-            </div>
-          </div>
-        </div>
         <div className="relative flex-1 min-h-0">
           <div className="h-full overflow-y-auto sidebar-scroll">
             {sessions.length === 0 && (!sessionsLoaded || isLoading) ? (
@@ -191,7 +133,7 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
               >
                 <Loading label="加载会话中" />
               </div>
-            ) : filteredSessions.length === 0 ? (
+            ) : sessions.length === 0 ? (
               <div
                 className="flex h-full flex-col items-center justify-center text-[#999999]"
                 style={{ fontFamily: sessionTitleFont }}
@@ -204,7 +146,7 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
                 <p className="mb-1.5 pl-3 text-[12px] font-normal leading-[18px] text-[#999999]">
                   历史会话
                 </p>
-                {filteredSessions.map((session) => (
+                {sessions.map((session) => (
                       <div
                         key={session.id}
                         className={cn(
@@ -313,7 +255,23 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
             className="pointer-events-none absolute inset-x-0 bottom-0 z-10 h-5 bg-gradient-to-b from-transparent to-[#FAFAFA]"
           />
         </div>
-        <div className="mt-auto pt-3">
+        <div className="mt-auto pt-3 space-y-1">
+          <button
+            type="button"
+            className="flex w-full items-center gap-3 rounded-xl border border-[#E6EEF6] bg-white px-4 py-3 text-left shadow-[0_1px_3px_rgba(0,0,0,0.04)] transition-all hover:shadow-[0_4px_12px_rgba(15,23,42,0.08)]"
+            onClick={() => {
+              createSession().catch(() => null);
+              navigate("/chat");
+              onClose();
+            }}
+          >
+            <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-[#60A5FA] to-[#2563EB] text-white shadow-[0_4px_10px_rgba(37,99,235,0.25)]">
+              <Plus className="h-4 w-4" />
+            </span>
+            <span className="flex-1">
+              <span className="block text-sm font-semibold text-[#1F2937]">新建对话</span>
+            </span>
+          </button>
           <button
             type="button"
             className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm font-medium text-[#1D4ED8] transition-colors hover:bg-[#EFF6FF]"
