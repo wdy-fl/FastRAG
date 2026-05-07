@@ -475,8 +475,18 @@ export const useChatStore = create<ChatState>((set, get) => ({
       ),
     }));
     if (!rating) {
-      await chatService.submitFeedback(messageId, null);
-      toast.success("取消成功");
+      try {
+        await chatService.submitFeedback(messageId, null);
+        toast.success("取消成功");
+      } catch {
+        const prevFeedback = prev?.feedback ?? null;
+        set((state) => ({
+          messages: state.messages.map((m) =>
+            m.id === messageId ? { ...m, feedback: prevFeedback } : m
+          ),
+        }));
+        toast.error("反馈保存失败");
+      }
       return;
     }
     try {
