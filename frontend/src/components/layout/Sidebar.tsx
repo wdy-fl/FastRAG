@@ -119,8 +119,8 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
               <Bot className="h-5 w-5 text-white" />
             </div>
             <div style={{ fontFamily: sessionTitleFont }}>
-              <p className="text-base font-semibold text-[#1A1A1A]">RAG 智能问答</p>
-              <p className="text-xs text-[#999999]">Powered by AI</p>
+              <p className="text-base font-semibold text-[#1A1A1A]">FastRAG</p>
+              <p className="text-xs text-[#999999]">更懂你的AI问答助手</p>
             </div>
           </div>
         </div>

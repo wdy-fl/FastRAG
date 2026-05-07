@@ -113,20 +113,62 @@ export function WelcomeScreen() {
         >
           <span className="inline-flex items-center gap-2 rounded-full border border-white/70 bg-white/70 px-3 py-1 text-xs font-medium text-[#2563EB] shadow-sm">
             <Bot className="h-3.5 w-3.5" />
-            RAG 智能问答
+            FastRAG
           </span>
           <h1 className="mt-4 font-display text-4xl leading-tight tracking-tight text-[#111827] sm:text-5xl md:text-6xl">
-            把问题变成
-            <span className="text-gradient">清晰答案</span>
+            为知识赋予
+            <span className="text-gradient">生命</span>
           </h1>
           <p className="mt-4 text-base text-[#4B5563] sm:text-lg">
-            结构化提问、知识检索与深度思考，一次对话给出可执行方案
+            上传文档，精准检索，构建你的专属知识库
           </p>
         </div>
 
         <div
           className="mt-10 opacity-0 animate-fade-up"
           style={{ animationDelay: "80ms", animationFillMode: "both" }}
+        >
+          <div className="flex items-center justify-center gap-2 text-xs uppercase tracking-[0.24em] text-[#94A3B8]">
+            <span className="h-px w-8 bg-[#E5E7EB]" />
+            试试这些开场
+            <span className="h-px w-8 bg-[#E5E7EB]" />
+          </div>
+          <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            {promptPresets.map((preset) => {
+              const Icon = preset.icon;
+              return (
+                <button
+                  key={preset.id ?? preset.title}
+                  type="button"
+                  onClick={() => applyPreset(preset.prompt)}
+                  disabled={isStreaming}
+                  className={cn(
+                    "group rounded-2xl border border-white/70 bg-white/70 p-4 text-left shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-[#BFDBFE] hover:shadow-md",
+                    isStreaming && "cursor-not-allowed opacity-60"
+                  )}
+                >
+                  <div className="flex items-center gap-3">
+                    <span className="flex h-10 w-10 items-center justify-center rounded-full bg-[#EFF6FF] text-[#2563EB]">
+                      <Icon className="h-4 w-4" />
+                    </span>
+                    <div>
+                      <p className="text-sm font-semibold text-[#1F2937]">{preset.title}</p>
+                      <p className="text-xs text-[#6B7280]">{preset.description}</p>
+                    </div>
+                  </div>
+                  <div className="mt-3 flex items-center gap-2 text-xs text-[#94A3B8]">
+                    <span className="min-w-0 flex-1 truncate">推荐问法：{preset.prompt}</span>
+                    <ArrowUpRight className="h-3.5 w-3.5 text-[#CBD5F5] transition-colors group-hover:text-[#3B82F6]" />
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        <div
+          className="mt-10 opacity-0 animate-fade-up"
+          style={{ animationDelay: "160ms", animationFillMode: "both" }}
         >
           <div
             className={cn(
@@ -226,48 +268,6 @@ export function WelcomeScreen() {
             换行
             {isStreaming ? <span className="ml-2 animate-pulse-soft">生成中...</span> : null}
           </p>
-        </div>
-
-        <div
-          className="mt-10 opacity-0 animate-fade-up"
-          style={{ animationDelay: "160ms", animationFillMode: "both" }}
-        >
-          <div className="flex items-center justify-center gap-2 text-xs uppercase tracking-[0.24em] text-[#94A3B8]">
-            <span className="h-px w-8 bg-[#E5E7EB]" />
-            试试这些开场
-            <span className="h-px w-8 bg-[#E5E7EB]" />
-          </div>
-          <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-            {promptPresets.map((preset) => {
-              const Icon = preset.icon;
-              return (
-                <button
-                  key={preset.id ?? preset.title}
-                  type="button"
-                  onClick={() => applyPreset(preset.prompt)}
-                  disabled={isStreaming}
-                  className={cn(
-                    "group rounded-2xl border border-white/70 bg-white/70 p-4 text-left shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-[#BFDBFE] hover:shadow-md",
-                    isStreaming && "cursor-not-allowed opacity-60"
-                  )}
-                >
-                  <div className="flex items-center gap-3">
-                    <span className="flex h-10 w-10 items-center justify-center rounded-full bg-[#EFF6FF] text-[#2563EB]">
-                      <Icon className="h-4 w-4" />
-                    </span>
-                    <div>
-                      <p className="text-sm font-semibold text-[#1F2937]">{preset.title}</p>
-                      <p className="text-xs text-[#6B7280]">{preset.description}</p>
-                    </div>
-                  </div>
-                  <div className="mt-3 flex items-center gap-2 text-xs text-[#94A3B8]">
-                    <span className="min-w-0 flex-1 truncate">推荐问法：{preset.prompt}</span>
-                    <ArrowUpRight className="h-3.5 w-3.5 text-[#CBD5F5] transition-colors group-hover:text-[#3B82F6]" />
-                  </div>
-                </button>
-              );
-            })}
-          </div>
         </div>
       </div>
     </div>
