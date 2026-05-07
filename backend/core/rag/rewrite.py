@@ -38,13 +38,7 @@ class LLMQueryRewriter:
         )
         prompt = _REWRITE_PROMPT.format(history=history_text or "none", query=query)
         logger.debug("查询改写 | query=%r | history_lines=%d", query, len(history.messages[-4:]))
-        parts: list[str] = []
-        async for event in self._llm.stream(
-            [{"role": "user", "content": prompt}]
-        ):
-            if event.type == "content":
-                parts.append(event.content)
-        result = "".join(parts).strip() or query
+        result = (await self._llm.chat([{"role": "user", "content": prompt}])).strip() or query
         logger.info("查询改写完成 | %r → %r", query, result)
         return result
 

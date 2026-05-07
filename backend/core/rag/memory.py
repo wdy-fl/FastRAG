@@ -68,13 +68,7 @@ class SlidingWindowMemory:
             f"之前的摘要: {existing_text}\n"
             f"近期消息:\n{history_text}"
         )
-        parts: list[str] = []
-        async for event in self._llm.stream(
-            [{"role": "user", "content": prompt}]
-        ):
-            if event.type == "content":
-                parts.append(event.content)
-        new_summary = "".join(parts)
+        new_summary = await self._llm.chat([{"role": "user", "content": prompt}])
         if recent:
             up_to_seq = max(msg.seq for msg in recent)
         else:

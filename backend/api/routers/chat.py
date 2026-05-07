@@ -74,11 +74,7 @@ async def _generate_title(query: str, llm: OpenAICompatClient) -> str:
                 "content": f"请用10字以内总结以下问题作为对话标题，只输出标题文字：{query}",
             }
         ]
-        title_parts: list[str] = []
-        async for event in llm.stream(messages, max_tokens=30):
-            if event.type == "content":
-                title_parts.append(event.content)
-        title = "".join(title_parts).strip()
+        title = (await llm.chat(messages, max_tokens=30)).strip()
         logger.info("会话标题生成完成 | title=%r", title)
         return title if title else query[:30]
     except Exception:
