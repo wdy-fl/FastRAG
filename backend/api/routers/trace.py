@@ -59,7 +59,7 @@ async def get_trace(
 ) -> TraceRunDetailResponse:
     run = await repo.get_run(run_id)
     if not run:
-        raise HTTPException(status_code=404, detail="Trace not found")
+        raise HTTPException(status_code=404, detail="追踪记录不存在")
     return TraceRunDetailResponse(
         id=run.id,
         conversation_id=run.conversation_id,

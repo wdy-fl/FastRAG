@@ -66,7 +66,7 @@ async def get_knowledge_base(
 ) -> KnowledgeBaseResponse:
     kb = await repo.get_knowledge_base(kb_id)
     if not kb:
-        raise HTTPException(status_code=404, detail="Knowledge base not found")
+        raise HTTPException(status_code=404, detail="知识库不存在")
     return _to_response(kb)
 
 
@@ -78,7 +78,7 @@ async def update_knowledge_base(
 ) -> KnowledgeBaseResponse:
     kb = await repo.get_knowledge_base(kb_id)
     if not kb:
-        raise HTTPException(status_code=404, detail="Knowledge base not found")
+        raise HTTPException(status_code=404, detail="知识库不存在")
     if body.name is not None:
         kb.name = body.name
     if body.description is not None:

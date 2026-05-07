@@ -59,7 +59,7 @@ async def list_messages(
 ) -> list[MessageResponse]:
     conv = await repo.get_conversation(conversation_id)
     if not conv:
-        raise HTTPException(status_code=404, detail="Conversation not found")
+        raise HTTPException(status_code=404, detail="会话不存在")
     messages = await repo.get_all_messages(conversation_id)
     return [
         MessageResponse(
@@ -77,7 +77,7 @@ async def get_conversation(
 ) -> ConversationResponse:
     conv = await repo.get_conversation(conversation_id)
     if not conv:
-        raise HTTPException(status_code=404, detail="Conversation not found")
+        raise HTTPException(status_code=404, detail="会话不存在")
     return ConversationResponse(id=conv.id, title=conv.title)
 
 
@@ -89,7 +89,7 @@ async def update_conversation(
 ) -> ConversationResponse:
     conv = await repo.get_conversation(conversation_id)
     if not conv:
-        raise HTTPException(status_code=404, detail="Conversation not found")
+        raise HTTPException(status_code=404, detail="会话不存在")
     await repo.update_title(conv, body.title)
     return ConversationResponse(id=conversation_id, title=body.title)
 

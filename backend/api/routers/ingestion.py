@@ -116,7 +116,7 @@ async def trigger_ingestion(
 ) -> TriggerIngestionResponse:
     kb = await kb_repo.get_knowledge_base(kb_id)
     if not kb:
-        raise HTTPException(status_code=404, detail="Knowledge base not found")
+        raise HTTPException(status_code=404, detail="知识库不存在")
 
     suffix = os.path.splitext(file.filename or "")[1]
     _TMP_DIR = os.path.join(os.path.dirname(__file__), "..", "..", "temp")
@@ -219,7 +219,7 @@ async def delete_document(
 ) -> None:
     doc = await kb_repo.get_document(doc_id)
     if not doc or doc.knowledge_base_id != kb_id:
-        raise HTTPException(status_code=404, detail="Document not found")
+        raise HTTPException(status_code=404, detail="文档不存在")
     if doc.status not in ("completed", "failed"):
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
@@ -249,7 +249,7 @@ async def get_ingestion_task(
 ) -> IngestionTaskResponse:
     task = await task_repo.get_by_document(doc_id)
     if not task:
-        raise HTTPException(status_code=404, detail="Ingestion task not found")
+        raise HTTPException(status_code=404, detail="导入任务不存在")
 
     node_timings = {
         r["node_name"]: r["duration_ms"]
@@ -282,7 +282,7 @@ async def list_chunks(
 ) -> ChunkListResponse:
     doc = await repo.get_document(doc_id)
     if not doc or doc.knowledge_base_id != kb_id:
-        raise HTTPException(status_code=404, detail="Document not found")
+        raise HTTPException(status_code=404, detail="文档不存在")
     chunks, total = await repo.list_chunks_by_document(doc_id, page, page_size)
     return ChunkListResponse(
         total=total,

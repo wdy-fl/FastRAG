@@ -123,7 +123,7 @@ class StopRequest(BaseModel):
 @router.post("/stop")
 async def chat_stop(body: StopRequest) -> dict:
     if body.task_id not in _task_registry:
-        raise HTTPException(status_code=404, detail="task not found")
+        raise HTTPException(status_code=404, detail="任务不存在")
     task = _task_registry.pop(body.task_id)
     if not task.done():
         task.cancel()
