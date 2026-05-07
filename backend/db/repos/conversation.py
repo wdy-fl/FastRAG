@@ -138,3 +138,16 @@ class ConversationRepo:
             delete(ConversationORM).where(ConversationORM.id == conversation_id)
         )
         await self._session.commit()
+
+    async def get_message(self, message_id: str) -> MessageORM | None:
+        stmt = select(MessageORM).where(MessageORM.id == message_id)
+        result = await self._session.execute(stmt)
+        return result.scalar_one_or_none()
+
+    async def update_message_feedback(self, message_id: str, feedback: str | None) -> None:
+        stmt = select(MessageORM).where(MessageORM.id == message_id)
+        result = await self._session.execute(stmt)
+        message = result.scalar_one_or_none()
+        if message:
+            message.feedback = feedback
+            await self._session.commit()
